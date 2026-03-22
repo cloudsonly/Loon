@@ -3,36 +3,64 @@ name: Convert Lists to SRS
 on:
   push:
     paths:
-      - 'Loon/*.list'     # 只要改了 list 文件就自动触发
-  workflow_dispatch:      # 也可以手动触发
+      - 'loon/*.list'
+  workflow_dispatch:
 
 jobs:
   convert:
     runs-on: ubuntu-latest
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # 解决 Node 20 警告
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Go and srsc
-        run: |
-          go install github.com/SagerNet/srsc@latest
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'   # 或 latest，srsc 需要 Go 1.21+
 
-      - name: Create srs folder
+      - name: Install srsc
+        run: go install github.com/SagerNet/srsc/cmd/srsc@latest
+
+      - name: Create output folder
         run: mkdir -p srs
 
-      - name: Convert all .list to .srs + .json
+      - name: Convert .list files to .srs and .json
         run: |
+          export PATH="$PATH:$(go env GOPATH)/bin"   # 关键！加 srsc 到 PATH
+          
+          if ! command -v srsc &> /dev/null; then
+            echo "srsc not found after install!"
+            exit 1
+          fi
+          
+          found=false
           for file in loon/*.list; do
-            if [ -f "$file" ]; then
+            if [[ -f "$file" ]]; then
+              found=true
               base=$(basename "$file" .list)
-              echo "Converting $file ..."
-              ~/go/bin/srsc convert -i "$file" -o "srs/$base.srs" -f srs
-              ~/go/bin/srsc convert -i "$file" -o "srs/$base.json" -f json
+              echo "Converting $file → srs/$base.srs and srs/$base.json"
+              
+              # 尝试新版常见写法（如果失败可换成旧版）
+              srsc convert --input "$file" --output "srs/$base.srs" --format srs || {
+                echo "SRS convert failed, trying fallback..."
+                srsc convert -i "$file" -o "srs/$base.srs" -f srs
+              }
+              
+              srsc convert --input "$file" --output "srs/$base.json" --format json || {
+                srsc convert -i "$file" -o "srs/$base.json" -f json
+              }
             fi
           done
+          
+          if [[ $found == false ]]; then
+            echo "No .list files found in loon/ !"
+            exit 0  # 不算错误，只是没东西转
+          fi
 
-      - name: Auto commit generated files
-        uses: stefanzweifel/git-auto-commit-action@v1
+      - name: Commit generated SRS/JSON files
+        uses: stefanzweifel/git-auto-commit-action@v5   # 升级到 v5，支持 Node 24
         with:
-          commit_message: "chore: auto generate .srs and .json"
+          commit_message: "chore: auto-generate .srs and .json from lists"
+          file_pattern: srs/*.*
