@@ -1,0 +1,36 @@
+name: Convert Lists to SRS
+
+on:
+  push:
+    paths:
+      - 'Loon/*.list'     # 只要改了 list 文件就自动触发
+  workflow_dispatch:      # 也可以手动触发
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Go and srsc
+        run: |
+          go install github.com/SagerNet/srsc@latest
+
+      - name: Create srs folder
+        run: mkdir -p srs
+
+      - name: Convert all .list to .srs + .json
+        run: |
+          for file in loon/*.list; do
+            if [ -f "$file" ]; then
+              base=$(basename "$file" .list)
+              echo "Converting $file ..."
+              ~/go/bin/srsc convert -i "$file" -o "srs/$base.srs" -f srs
+              ~/go/bin/srsc convert -i "$file" -o "srs/$base.json" -f json
+            fi
+          done
+
+      - name: Auto commit generated files
+        uses: stefanzweifel/git-auto-commit-action@v1
+        with:
+          commit_message: "chore: auto generate .srs and .json"
