@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "domain": [
+        "ow.mapleqaq.top",
+        "syx.saodu.work",
+        "tv.micu.hk",
+        "tv1.micu.hk",
+        "mi2.miraiemby.com",
+        "mi3.miraiemby.com",
+        "a.eoos.top",
+        "auto.dolby.dpdns.org",
+        "auto.liuer.indevs.in",
+        "auto.embys.dpdns.org",
+        "fd.dirige.de5.net",
+        "auto-zerocost.dolby.dpdns.org"
+      ],
+      "domain_suffix": [
+        ".yuntv.de",
+        ".4348663.xyz",
+        ".koi.us.ci",
+        ".emby.yun"
+      ]
+    }
+  ]
+}
