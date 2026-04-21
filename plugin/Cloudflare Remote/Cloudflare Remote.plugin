@@ -1,1 +1,16 @@
+#!name=CloudflareRemote 解锁
+#!desc=RevenueCat 订阅解锁（Premium）
+#!openUrl = https://apps.apple.com/cn/app/cloudflare-remote/id6743181258
+#!author=𝓢𝓪𝓷[https://github.com/cloudsonly?tab=repositories]
+#!icon=https://raw.githubusercontent.com/cloudsonly/Loon/edit/main/plugin/Cloudflare%20Remote/Cloudflare%20Remote-iOS-512x512.png
 
+[MITM]
+hostname = api.revenuecat.com, api-paywalls.revenuecat.com
+
+[URL Rewrite]
+^https://api\.revenuecat\.com/v1/subscribers/ header-replace x-revenuecat-etag ""
+^https://api\.revenuecat\.com/v1/subscribers/.* response-body-json-add subscriber.entitlements.Premium {"expires_date":"2099-01-01T00:00:00Z","product_identifier":"subscription_cf_lifetime","purchase_date":"2023-01-01T00:00:00Z"}
+^https://api\.revenuecat\.com/v1/subscribers/.* response-body-json-add subscriber.subscriptions.subscription_cf_lifetime {"expires_date":"2099-01-01T00:00:00Z","purchase_date":"2023-01-01T00:00:00Z"}
+^https://api\.revenuecat\.com/v1/receipts$ response-body-json-add subscriber.entitlements.Premium {"expires_date":"2099-01-01T00:00:00Z","product_identifier":"subscription_cf_lifetime","purchase_date":"2023-01-01T00:00:00Z"}
+^https://api\.revenuecat\.com/v1/receipts$ response-body-json-add subscriber.subscriptions.subscription_cf_lifetime {"expires_date":"2099-01-01T00:00:00Z","purchase_date":"2023-01-01T00:00:00Z"}
+^https://api-paywalls\.revenuecat\.com/v1/events reject-200
