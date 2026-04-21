@@ -192,7 +192,11 @@ function buildHeaders(capture, ua) {
 }
 
 function notify(title, body) {
-  $notify(scriptName, title, body);
+  if (typeof $notification !== 'undefined') {
+    $notification.post('WeTalk', title, body);
+  } else {
+    $notify('WeTalk', title, body);
+  }
 }
 
 function sleep(ms) {
