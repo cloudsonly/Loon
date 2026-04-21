@@ -209,9 +209,27 @@ function runAccount(acc, index, total) {
   const headers = buildHeaders(acc.capture, ua);
   const msgs = [tag];
 
-  function fetchApi(path) {
-    return $task.fetch({ url: buildUrl(path, acc.capture), method: 'GET', headers });
-  }
+function fetchApi(path) {
+  return new Promise((resolve, reject) => {
+    $httpClient.get(
+      {
+        url: buildUrl(path, acc.capture),
+        headers: headers
+      },
+      (error, response, data) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve({
+            statusCode: response.status,
+            headers: response.headers,
+            body: data
+          });
+        }
+      }
+    );
+  });
+}
 
   function doVideoLoop(count) {
     let i = 0;
