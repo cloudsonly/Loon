@@ -1,6 +1,6 @@
-#!name=WeTalk 自动化签到+视频奖励
-#!desc=WeTalk
-#!author= TG@ZenMoFiShi
+#!name=WeTalk
+#!desc=WeTalk 自动化签到+视频奖励\n@sansian 修改兼容Loon
+#!author= TG@ZenMoFiShi[https://github.com/ZenmoFeiShi?tab=repositories]
 #!icon=https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png
 
 [Script]
