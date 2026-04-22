@@ -1,5 +1,5 @@
 #!name=WeTalk
-#!desc=WeTalk 自动化签到+视频奖励\n@sansian 修改兼容Loon
+#!desc=WeTalk 自动化签到+视频奖励\n san 修改兼容Loon
 #!author= ZenMoFiShi[https://github.com/ZenmoFeiShi?tab=repositories]
 #!icon=https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png
 #!date = 2026-04-21 21:00:00
@@ -7,7 +7,7 @@
 [Script]
 http-request ^https:\/\/api\.wetalkapp\.com\/app\/queryBalanceAndBonus script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.js, tag=WeTalk
 
-cron "20 8,20 * * *" script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.js, timeout=120, tag=WeTalk签到
+cron "20 0,8,16 * * *" script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.js, timeout=120, tag=WeTalk签到
 
 [MITM]
 hostname = api.wetalkapp.com
