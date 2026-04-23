@@ -2,7 +2,7 @@
 #!desc=Premium Unlock
 #!openUrl = https://apps.apple.com/cn/app/swiftserver-%E6%9C%8D%E5%8A%A1%E5%99%A8%E7%9B%91%E6%8E%A7-ssh%E7%BB%88%E7%AB%AF/id6740036221
 #!author=𝓢𝓪𝓷[https://github.com/cloudsonly?tab=repositories]
-#!icon=
+#!icon=https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/07/9d/d2/079dd227-c5f2-660a-cec9-27497bb62edd/Placeholder.mill/400x400bb-75.webp
 
 [MITM]
 hostname = api.revenuecat.com
