@@ -1,12 +1,7 @@
 // Turrit Safari Redirect for Loon
 const reqUrl = $request.url;
 const appStore = 'https://apps.apple.com/us/app/turrit-a-plus-messenger/id6471781238';
-
-function buildDirectUrl(u) {
-  return 'turrit://resolve?domain=' + encodeURIComponent(u);
-}
-
-const direct = buildDirectUrl(reqUrl);
+const direct = 'turrit://parseurl?url=' + encodeURIComponent(reqUrl);
 
 const body = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Redirect</title></head><body><script>
 location.replace(${JSON.stringify(direct)});
