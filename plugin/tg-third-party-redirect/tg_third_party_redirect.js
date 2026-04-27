@@ -60,30 +60,15 @@ function buildTargets(prefix, rawUrl) {
   const parseurl = buildParseUrl(prefix, rawUrl);
 
   if (prefix === 'turrit') {
-    return {
-      direct: precise || parseurl,
-      fallback: parseurl,
-    };
+    return { direct: precise || parseurl, fallback: parseurl };
   }
-
   if (prefix === 'sg') {
-    return {
-      direct: parseurl,
-      fallback: precise || parseurl,
-    };
+    return { direct: parseurl, fallback: precise || parseurl };
   }
-
   if (prefix === 'tg') {
-    return {
-      direct: precise || parseurl,
-      fallback: precise || parseurl,
-    };
+    return { direct: precise || parseurl, fallback: precise || parseurl };
   }
-
-  return {
-    direct: precise || parseurl,
-    fallback: parseurl,
-  };
+  return { direct: precise || parseurl, fallback: parseurl };
 }
 
 if (method !== 'GET') {
