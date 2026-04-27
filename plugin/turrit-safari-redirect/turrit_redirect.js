@@ -18,11 +18,11 @@ function buildScheme(prefix, action, query) {
   return prefix + '://' + action + (query ? '?' + query : '');
 }
 
-function buildFallback(prefix, rawUrl) {
+function buildParseUrl(prefix, rawUrl) {
   return buildScheme(prefix, 'parseurl', 'url=' + encodeURIComponent(rawUrl));
 }
 
-function buildDirectUrl(prefix, rawUrl) {
+function buildPreciseUrl(prefix, rawUrl) {
   try {
     const url = new URL(rawUrl);
     const host = url.hostname.replace(/^www\./, '');
@@ -52,7 +52,38 @@ function buildDirectUrl(prefix, rawUrl) {
       }
     }
   } catch (e) {}
-  return buildFallback(prefix, rawUrl);
+  return '';
+}
+
+function buildTargets(prefix, rawUrl) {
+  const precise = buildPreciseUrl(prefix, rawUrl);
+  const parseurl = buildParseUrl(prefix, rawUrl);
+
+  if (prefix === 'turrit') {
+    return {
+      direct: precise || parseurl,
+      fallback: parseurl,
+    };
+  }
+
+  if (prefix === 'sg') {
+    return {
+      direct: parseurl,
+      fallback: precise || parseurl,
+    };
+  }
+
+  if (prefix === 'tg') {
+    return {
+      direct: precise || parseurl,
+      fallback: precise || parseurl,
+    };
+  }
+
+  return {
+    direct: precise || parseurl,
+    fallback: parseurl,
+  };
 }
 
 if (method !== 'GET') {
@@ -76,9 +107,10 @@ if (method !== 'GET') {
     pass();
   } else {
     const body = $response.body || '';
-    const direct = buildDirectUrl(client, reqUrl);
-    const fallback = buildFallback(client, reqUrl);
-    const injected = '<script>(function(){var direct=' + JSON.stringify(direct) + ';var fallback=' + JSON.stringify(fallback) + ';location.replace(direct);setTimeout(function(){location.href=fallback;},400);})();</script>';
+    const targets = buildTargets(client, reqUrl);
+    const direct = targets.direct;
+    const fallback = targets.fallback;
+    const injected = '<script>(function(){var direct=' + JSON.stringify(direct) + ';var fallback=' + JSON.stringify(fallback) + ';location.replace(direct);if(fallback&&fallback!==direct){setTimeout(function(){location.href=fallback;},400);}})();</script>';
 
     if (/<head[^>]*>/i.test(body)) {
       pass(body.replace(/<head[^>]*>/i, function(m) { return m + injected; }));
