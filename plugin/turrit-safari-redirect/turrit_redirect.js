@@ -1,12 +1,20 @@
-// Turrit Safari Redirect for Loon
+// Turrit response injection for Loon
 const reqUrl = $request.url;
 const method = ($request.method || 'GET').toUpperCase();
+const headers = $response.headers || {};
+const contentType = headers['Content-Type'] || headers['content-type'] || '';
 
-function pass() {
-  $done({});
+function pass(body) {
+  if (typeof body === 'string') {
+    $done({ body });
+  } else {
+    $done({});
+  }
 }
 
 if (method !== 'GET') {
+  pass();
+} else if (!/text\/html/i.test(contentType)) {
   pass();
 } else {
   let url;
@@ -20,18 +28,19 @@ if (method !== 'GET') {
   const hasEmbed = url.searchParams.get('embed') === '1';
   const hasMode = url.searchParams.has('mode');
   const isStats = path === '/v/' || path.indexOf('/v/') === 0;
-  const isAssetLike = /\.(js|css|png|jpg|jpeg|gif|svg|webp|ico|woff2?)$/i.test(path);
 
-  if (hasEmbed || hasMode || isStats || isAssetLike) {
+  if (hasEmbed || hasMode || isStats) {
     pass();
   } else {
-    const direct = 'turrit://parseurl?url=' + encodeURIComponent(reqUrl);
-    $done({
-      status: 'HTTP/1.1 302 Found',
-      headers: {
-        Location: direct,
-        'Cache-Control': 'no-store',
-      },
-    });
+    const body = $response.body || '';
+    const injected = '<script>location.replace(' + JSON.stringify('turrit://parseurl?url=' + encodeURIComponent(reqUrl)) + ');</script>';
+
+    if (/<head[^>]*>/i.test(body)) {
+      pass(body.replace(/<head[^>]*>/i, function(m) { return m + injected; }));
+    } else if (/<html[^>]*>/i.test(body)) {
+      pass(body.replace(/<html[^>]*>/i, function(m) { return m + '<head>' + injected + '</head>'; }));
+    } else {
+      pass(injected + body);
+    }
   }
 }

@@ -7,4 +7,4 @@
 hostname = t.me, telegram.me, telegram.dog, www.telegram.dog
 
 [Script]
-http-request ^https?:\/\/(t\.me|telegram\.me|(?:www\.)?telegram\.dog)\/.*$ script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/turrit-safari-redirect/turrit_redirect.js, requires-body=false, timeout=20, tag=TG官方外链跳转到第三方
+http-response ^https?:\/\/(t\.me|telegram\.me|(?:www\.)?telegram\.dog)\/.*$ script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/turrit-safari-redirect/turrit_redirect.js, requires-body=true, timeout=20, tag=TG官方外链跳转到第三方
