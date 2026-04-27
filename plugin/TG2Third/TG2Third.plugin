@@ -1,12 +1,11 @@
-#!name=Turrit Safari 跳转
-#!desc=在 Safari 打开 Telegram 官方外链时，自动重定向到 Turrit/Telegram Scheme
-#!author=Minis
-#!homepage=https://iturrit.com
-#!version=1.0
+#!name=TG官方外链跳转到第三方
+#!desc=在 Safari 打开 Telegram 官方外链时，自动重定向到第三方Telegram Scheme
+#!author=𝓢𝓪𝓷[https://github.com/cloudsonly?tab=repositories]
+#!icon=https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/a9/70/5a/a9705a15-e446-c2c9-7dac-3247a2d091b5/Placeholder.mill/200x200bb-75.webp
 
 [URL Rewrite]
 ^https?:\/\/(t\.me|telegram\.me)\/.*$ http://127.0.0.1:65534 302
 ^https?:\/\/(www\.)?telegram\.dog\/.*$ http://127.0.0.1:65534 302
 
 [Script]
-http-request ^https?:\/\/(t\.me|telegram\.me|www\.telegram\.dog)\/.*$ script-path=https://raw.githubusercontent.com/blank/blank/main/turrit_redirect.js, requires-body=false, timeout=10, tag=Turrit 跳转
+http-request ^https?:\/\/(t\.me|telegram\.me|www\.telegram\.dog)\/.*$ script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/TG2Third/TG2Third.js, requires-body=false, timeout=10, tag=Turrit 跳转
