@@ -1,8 +1,8 @@
 #!name=Turrit Safari 跳转
 #!desc=Safari 打开 Telegram 官方外链时优先拉起 Turrit
 #!author=Minis
-#!homepage=https://github.com/cloudsonly/Loon/tree/main/plugin
-#!version=1.2
+#!homepage=https://github.com/cloudsonly/Loon/tree/main/plugin/turrit-safari-redirect
+#!version=1.3
 
 [Script]
-http-request ^https?:\/\/(t\.me|telegram\.me|(?:www\.)?telegram\.dog)\/.*$ script-path=https://raw.githubusercontent.com/cloudsonly/Loon/main/plugin/turrit_redirect.js, requires-body=false, timeout=20, tag=Turrit 跳转
+http-request ^https?:\/\/(t\.me|telegram\.me|(?:www\.)?telegram\.dog)\/.*$ script-path=https://raw.githubusercontent.com/cloudsonly/Loon/main/plugin/turrit-safari-redirect/turrit_redirect.js, requires-body=false, timeout=20, tag=Turrit 跳转
