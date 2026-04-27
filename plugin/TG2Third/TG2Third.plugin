@@ -1,0 +1,12 @@
+#!name=Turrit Safari 跳转
+#!desc=在 Safari 打开 Telegram 官方外链时，自动重定向到 Turrit/Telegram Scheme
+#!author=Minis
+#!homepage=https://iturrit.com
+#!version=1.0
+
+[URL Rewrite]
+^https?:\/\/(t\.me|telegram\.me)\/.*$ http://127.0.0.1:65534 302
+^https?:\/\/(www\.)?telegram\.dog\/.*$ http://127.0.0.1:65534 302
+
+[Script]
+http-request ^https?:\/\/(t\.me|telegram\.me|www\.telegram\.dog)\/.*$ script-path=https://raw.githubusercontent.com/blank/blank/main/turrit_redirect.js, requires-body=false, timeout=10, tag=Turrit 跳转
