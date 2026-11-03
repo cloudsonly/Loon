@@ -19,9 +19,7 @@ hostname = api.wetalkapp.com
 const scriptName = 'WeTalk';
 const SCRIPT_VERSION = 'BoxJS.2026-11-04'; // 确认是否拉到最新版
 const storeKey = 'wetalk_accounts_v1';
-const K_DEL_KEYS = '@WeTalk.delKeys';
 const K_CLEAR_ALL = '@WeTalk.clearAll';
-const K_RESET_TOKEN = '@WeTalk.resetToken';
 const SECRET = '0fOiukQq7jXZV2GRi9LGlO';
 const API_HOST = 'api.wetalkapp.com';
 const MAX_VIDEO = 5;
@@ -194,90 +192,18 @@ function saveStore(store) {
   writeKey(JSON.stringify(store), storeKey);
 }
 
-/* ==================== BoxJS 账号管理 ==================== */
+/* ==================== BoxJS：清空开关 ==================== */
+// BoxJS 里打开「清空全部账号」开关后，一次抓包（或一次签到）即执行清空并自动复位。
+// 精细删除（按序号）请用 WeTalk.del.js，本脚本不碰。
 
-function accountLabel(acc) {
-  const p = (acc.capture || {}).paramsRaw || {};
-  const uid = p.uid || p.userId || p.id || p.account || p.mobile || p.phone || '';
-  const created = acc.createdAt ? new Date(acc.createdAt).toLocaleDateString() : '';
-  const plat = (p.platform || p.os || '').toUpperCase();
-  return `${acc.alias || acc.id}${uid ? ' · uid:' + String(uid).slice(0, 22) : ''}${plat ? ' · ' + plat : ''}${created ? ' · ' + created : ''}`;
-}
-
-function renderAccountList(store, keys) {
-  const selected = new Set((keys || []).map(String));
-  const lines = store.order.map((id, i) => {
-    const acc = store.accounts[id] || {};
-    return `${i + 1}. ${selected.has(id) ? '☑' : '☐'} ${accountLabel(acc)}  (${id})`;
-  });
-  const text = lines.length ? lines.join('\n') : '（账号库为空）';
-  writeKey(text, '@WeTalk.accountListText');
-  writeKey(JSON.stringify(store.order.map(id => ({ id, key: id, label: accountLabel(store.accounts[id] || {}) }))), '@WeTalk.accountList');
-  // 上次清理结果也挂在这里，删掉的账号会保留成【已删除】行，便于核对
-  return text;
-}
-
-function readDelKeys() {
-  let raw = readKey(K_DEL_KEYS);
-  if (raw === null || raw === undefined) raw = readKey('@' + K_DEL_KEYS);
-  if (!raw) return [];
-  raw = String(raw).trim();
-  if (!raw) return [];
-  let arr = [];
-  try {
-    const j = JSON.parse(raw);
-    if (Array.isArray(j)) arr = j.map(x => (x && typeof x === 'object' ? (x.key || x.id) : x));
-  } catch (e) {
-    arr = raw.split(/[,\s，、]+/);
-  }
-  return arr.map(x => String(x || '').trim()).filter(Boolean);
-}
-
-// 真正执行 BoxJS 里已保存的清理动作；返回产生的提示文案（数组）
-function applyBoxjsCleaning(store) {
-  const msgs = [];
-  let rawClear = readKey(K_CLEAR_ALL);
-  if (rawClear === null || rawClear === undefined) rawClear = readKey('@' + K_CLEAR_ALL);
-  const clearAll = String(rawClear || 'false').trim().toLowerCase();
-
-  if (clearAll === 'true' || clearAll === '1' || clearAll === 'yes') {
-    const before = store.order.length;
-    store.order = [];
-    store.accounts = {};
-    saveStore(store);
-    writeKey('false', K_CLEAR_ALL);
-    writeKey('', '@' + K_CLEAR_ALL);
-    writeKey('[]', K_DEL_KEYS);
-    writeKey('', '@' + K_DEL_KEYS);
-    msgs.push(`✅ 已清空全部 ${before} 个账号，请重新抓包`);
-    return msgs;
-  }
-
-  const rawKeys = readDelKeys();
-  const delIds = rawKeys.map(k => {
-    if (/^\d+$/.test(k) && !store.accounts[k]) return store.order[parseInt(k, 10) - 1] || k;
-    return k;
-  }).filter(Boolean);
-
-  if (delIds.length) {
-    const prev = JSON.parse(JSON.stringify(store.accounts));
-    const hit = delIds.filter(id => store.accounts[id]);
-    if (hit.length) {
-      const remain = store.order.filter(id => !delIds.includes(id));
-      const nextAccounts = {};
-      remain.forEach(id => { nextAccounts[id] = store.accounts[id]; });
-      store.order = remain;
-      store.accounts = nextAccounts;
-      saveStore(store);
-      writeKey('[]', K_DEL_KEYS);
-      writeKey('', '@' + K_DEL_KEYS);
-      msgs.push(`🗑 已删除 ${hit.length} 个账号，剩余 ${store.order.length} 个`);
-      try {
-        writeKey(hit.map(id => `〔已删除〕${accountLabel(prev[id] || { id })}  (${id})`).join('\n'), '@WeTalk.lastDeleted');
-      } catch (e) {}
-    }
-  }
-  return msgs;
+function takeClearAllSwitch() {
+  let raw = readKey(K_CLEAR_ALL);
+  if (raw === null || raw === undefined) raw = readKey('@' + K_CLEAR_ALL);
+  const v = String(raw || 'false').trim().toLowerCase();
+  if (v !== 'true' && v !== '1' && v !== 'yes') return false;
+  writeKey('false', K_CLEAR_ALL);
+  writeKey('', '@' + K_CLEAR_ALL);
+  return true;
 }
 
 function pickItem(arr, seed) {
@@ -444,12 +370,17 @@ const $ = {
   done: (v) => { try { if (typeof $done !== 'undefined') $done(v || {}); } catch (e) {} }
 };
 
-// 抓包：先处理 BoxJS 里排队的清理，再入库
+// 抓包：先看「清空全部账号」开关，再入库
 function onCapture() {
-  const store = loadStore();
-  let cleanMsgs = [];
-  try { cleanMsgs = applyBoxjsCleaning(store); } catch (e) { $.log('清理失败 ' + e); }
-  renderAccountList(store, readDelKeys());
+  let store = loadStore();
+  let cleared = 0;
+  try {
+    if (takeClearAllSwitch()) {
+      cleared = store.order.length;
+      store = { version: 1, accounts: {}, order: [] };
+      saveStore(store);
+    }
+  } catch (e) { $.log('清空失败 ' + e); }
 
   const paramsRaw = parseRawQuery($request.url);
   const headersMap = normalizeHeaderNameMap($request.headers || {});
@@ -473,12 +404,9 @@ function onCapture() {
   };
   if (!existed) store.order.push(fp);
   saveStore(store);
-  renderAccountList(store, readDelKeys());
 
-  if (cleanMsgs.length) {
-    notify('🧹 账号库已维护', cleanMsgs.join('\n') + `\n当前账号总数：${store.order.length}`);
-  }
-  notify(existed ? '🔄 账号参数已更新' : '✅ 新账号已入库', `${alias}（id:${fp}）\n当前账号总数：${store.order.length}\n可在 BoxJS → WeTalk 里删除不需要的账号`);
+  if (cleared) notify('🧹 已清空账号库', `原来 ${cleared} 个账号已全部清除，本次重新入库：${alias}`);
+  notify(existed ? '🔄 账号参数已更新' : '✅ 新账号已入库', `${alias}（id:${fp}）\n当前账号总数：${store.order.length}`);
   $.log(`获取/更新账号 Token 成功: ID => ${fp}`);
   $.done({});
 }
@@ -486,17 +414,20 @@ function onCapture() {
 
 if (typeof $request !== 'undefined' && $request && $request.url) {
   onCapture();
-} else if (typeof $script !== 'undefined' && $script && /runManage/.test(String($script.name || ''))) {
-  runManage();
 } else {
   // cron：先执行排队的清理，再跑签到
-  const store = loadStore();
-  const cleanMsgs = applyBoxjsCleaning(store);
-  renderAccountList(store, readDelKeys());
+  let store = loadStore();
+  let clearMsg = '';
+  if (takeClearAllSwitch()) {
+    const n = store.order.length;
+    store = { version: 1, accounts: {}, order: [] };
+    saveStore(store);
+    clearMsg = `🧹 已清空 ${n} 个账号，请重新抓包\n`;
+  }
   const ids = store.order.filter(id => store.accounts[id]);
   if (!ids.length) {
     $.log('未检测到已存储的账号数据，请先抓包');
-    notify('⚠️ 未抓到任何账号', (cleanMsgs.join('\n') + '\n' || '') + '请先打开 WeTalk 触发抓包');
+    notify('⚠️ 未抓到任何账号', clearMsg + '请先打开 WeTalk 触发抓包');
     $.done();
   } else {
     const total = ids.length;
@@ -510,7 +441,7 @@ if (typeof $request !== 'undefined' && $request && $request.url) {
     });
     chain.then(() => {
       $.log('=== 任务全部执行完毕 ===');
-      notify(`🎉 全部完成 (${total}个账号)`, (cleanMsgs.length ? cleanMsgs.join('\n') + '\n' : '') + results.join('\n———\n'));
+      notify(`🎉 全部完成 (${total}个账号)`, clearMsg + results.join('\n———\n'));
       $.done();
     }).catch(err => {
       $.log(`❌ 顶层任务异常: ${err}`);
