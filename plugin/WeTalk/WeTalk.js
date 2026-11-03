@@ -197,85 +197,87 @@ function saveStore(store) {
 /* ==================== BoxJS 账号管理 ==================== */
 
 function accountLabel(acc) {
-  const cap = acc.capture || {};
-  const p = cap.paramsRaw || {};
+  const p = (acc.capture || {}).paramsRaw || {};
   const uid = p.uid || p.userId || p.id || p.account || p.mobile || p.phone || '';
   const created = acc.createdAt ? new Date(acc.createdAt).toLocaleDateString() : '';
-  return `${acc.alias || acc.id}${uid ? ' · ' + String(uid).slice(0, 22) : ''}${created ? ' · ' + created : ''}`;
+  const plat = (p.platform || p.os || '').toUpperCase();
+  return `${acc.alias || acc.id}${uid ? ' · uid:' + String(uid).slice(0, 22) : ''}${plat ? ' · ' + plat : ''}${created ? ' · ' + created : ''}`;
 }
 
-function splitKeys(text) {
-  return String(text || '').split(/[,\s，、;；\n]+/).map(x => x.trim()).filter(Boolean);
-}
-
-// 把 BoxJS「账号列表」渲染成与勾选状态一致（{id,key,label} 供前端取，另存一份可读文本）
 function renderAccountList(store, keys) {
-  const selected = new Set(keys || []);
-  const items = store.order.map(id => {
+  const selected = new Set((keys || []).map(String));
+  const lines = store.order.map((id, i) => {
     const acc = store.accounts[id] || {};
-    return { id, key: id, label: accountLabel(acc) };
+    return `${i + 1}. ${selected.has(id) ? '☑' : '☐'} ${accountLabel(acc)}  (${id})`;
   });
-  const text = items.length ? items.map((it, i) => `${i + 1}. ${selected.has(it.id) ? '☑' : '☐'} ${it.label}  (${it.id})`).join('\n') : '（账号库为空）';
-  writeKey(JSON.stringify(items), '@WeTalk.accountList');
+  const text = lines.length ? lines.join('\n') : '（账号库为空）';
   writeKey(text, '@WeTalk.accountListText');
+  writeKey(JSON.stringify(store.order.map(id => ({ id, key: id, label: accountLabel(store.accounts[id] || {}) }))), '@WeTalk.accountList');
+  // 上次清理结果也挂在这里，删掉的账号会保留成【已删除】行，便于核对
+  return text;
+}
+
+function readDelKeys() {
+  let raw = readKey(K_DEL_KEYS);
+  if (raw === null || raw === undefined) raw = readKey('@' + K_DEL_KEYS);
+  if (!raw) return [];
+  raw = String(raw).trim();
+  if (!raw) return [];
+  let arr = [];
+  try {
+    const j = JSON.parse(raw);
+    if (Array.isArray(j)) arr = j.map(x => (x && typeof x === 'object' ? (x.key || x.id) : x));
+  } catch (e) {
+    arr = raw.split(/[,\s，、]+/);
+  }
+  return arr.map(x => String(x || '').trim()).filter(Boolean);
 }
 
 // 真正执行 BoxJS 里已保存的清理动作；返回产生的提示文案（数组）
 function applyBoxjsCleaning(store) {
   const msgs = [];
+  let rawClear = readKey(K_CLEAR_ALL);
+  if (rawClear === null || rawClear === undefined) rawClear = readKey('@' + K_CLEAR_ALL);
+  const clearAll = String(rawClear || 'false').trim().toLowerCase();
 
-  const clearAll = String(readKey(K_CLEAR_ALL) || 'false').trim();
-  if (clearAll === 'true' || clearAll === '1') {
+  if (clearAll === 'true' || clearAll === '1' || clearAll === 'yes') {
+    const before = store.order.length;
     store.order = [];
     store.accounts = {};
     saveStore(store);
     writeKey('false', K_CLEAR_ALL);
+    writeKey('', '@' + K_CLEAR_ALL);
     writeKey('[]', K_DEL_KEYS);
-    msgs.push('✅ 已清空全部账号，请重新抓包');
+    writeKey('', '@' + K_DEL_KEYS);
+    msgs.push(`✅ 已清空全部 ${before} 个账号，请重新抓包`);
     return msgs;
   }
 
-  let delIds = [];
-  try {
-    const raw = readKey(K_DEL_KEYS);
-    if (raw) {
-      const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) delIds = arr.map(x => String(x)).filter(Boolean);
-    }
-  } catch (e) {}
+  const rawKeys = readDelKeys();
+  const delIds = rawKeys.map(k => {
+    if (/^\d+$/.test(k) && !store.accounts[k]) return store.order[parseInt(k, 10) - 1] || k;
+    return k;
+  }).filter(Boolean);
 
   if (delIds.length) {
+    const prev = JSON.parse(JSON.stringify(store.accounts));
     const hit = delIds.filter(id => store.accounts[id]);
-    store.order = store.order.filter(id => !delIds.includes(id));
-    Object.keys(store.accounts).forEach(id => { if (!store.order.includes(id)) delete store.accounts[id]; });
     if (hit.length) {
+      const remain = store.order.filter(id => !delIds.includes(id));
+      const nextAccounts = {};
+      remain.forEach(id => { nextAccounts[id] = store.accounts[id]; });
+      store.order = remain;
+      store.accounts = nextAccounts;
       saveStore(store);
+      writeKey('[]', K_DEL_KEYS);
+      writeKey('', '@' + K_DEL_KEYS);
       msgs.push(`🗑 已删除 ${hit.length} 个账号，剩余 ${store.order.length} 个`);
-    } else {
-      msgs.push(`⚠️ 勾选的账号已不存在，忽略（剩余 ${store.order.length} 个）`);
+      try {
+        writeKey(hit.map(id => `〔已删除〕${accountLabel(prev[id] || { id })}  (${id})`).join('\n'), '@WeTalk.lastDeleted');
+      } catch (e) {}
     }
-    writeKey('[]', K_DEL_KEYS);
   }
   return msgs;
-}
-
-function finishManage(store, msgs) {
-  renderAccountList(store);
-  writeKey(JSON.stringify(msgs && msgs.length ? msgs : ['✅ 账号库无需变更']), K_RESET_TOKEN);
-  return msgs;
-}
-
-// 独立的清理脚本入口（BoxJS「保存账号记录」▶ / Loon 手动运行 / cron）
-function runManage() {
-  const store = loadStore();
-  const before = store.order.length;
-  const msgs = applyBoxjsCleaning(store);
-  renderAccountList(store);
-  const changed = store.order.length !== before || msgs.length;
-  writeKey(JSON.stringify(msgs.length ? msgs : ['ℹ️ 当前共 ' + store.order.length + ' 个账号，无需清理']), K_RESET_TOKEN);
-  notify('账号库维护', (msgs.length ? msgs.join('\n') : '当前共 ' + store.order.length + ' 个账号') + '\n' + (store.order.length ? store.order.map((id, i) => `${i + 1}. ${(store.accounts[id] || {}).alias || id}`).join('\n') : ''));
-  $.done({});
-  return changed;
 }
 
 function pickItem(arr, seed) {
@@ -447,7 +449,7 @@ function onCapture() {
   const store = loadStore();
   let cleanMsgs = [];
   try { cleanMsgs = applyBoxjsCleaning(store); } catch (e) { $.log('清理失败 ' + e); }
-  renderAccountList(store, readKeysNow());
+  renderAccountList(store, readDelKeys());
 
   const paramsRaw = parseRawQuery($request.url);
   const headersMap = normalizeHeaderNameMap($request.headers || {});
@@ -471,7 +473,7 @@ function onCapture() {
   };
   if (!existed) store.order.push(fp);
   saveStore(store);
-  renderAccountList(store, readKeysNow());
+  renderAccountList(store, readDelKeys());
 
   if (cleanMsgs.length) {
     notify('🧹 账号库已维护', cleanMsgs.join('\n') + `\n当前账号总数：${store.order.length}`);
@@ -481,13 +483,6 @@ function onCapture() {
   $.done({});
 }
 
-function readKeysNow() {
-  try {
-    const raw = readKey(K_DEL_KEYS);
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr.map(String) : [];
-  } catch (e) { return []; }
-}
 
 if (typeof $request !== 'undefined' && $request && $request.url) {
   onCapture();
@@ -497,7 +492,7 @@ if (typeof $request !== 'undefined' && $request && $request.url) {
   // cron：先执行排队的清理，再跑签到
   const store = loadStore();
   const cleanMsgs = applyBoxjsCleaning(store);
-  renderAccountList(store, readKeysNow());
+  renderAccountList(store, readDelKeys());
   const ids = store.order.filter(id => store.accounts[id]);
   if (!ids.length) {
     $.log('未检测到已存储的账号数据，请先抓包');
