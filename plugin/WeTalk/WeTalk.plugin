@@ -5,9 +5,9 @@
 #!date = 2026-11-04 06:00:00
 
 [Script]
-http-request ^https:\/\/api\.wetalkapp\.com\/app\/queryBalanceAndBonus script-path=https://raw.githubusercontent.com/cloudsonly/Loon/main/plugin/WeTalk/WeTalk.js, tag=WeTalk
+http-request ^https:\/\/api\.wetalkapp\.com\/app\/queryBalanceAndBonus script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.js, tag=WeTalk
 
-cron "20 0,8,16 * * *" script-path=https://raw.githubusercontent.com/cloudsonly/Loon/main/plugin/WeTalk/WeTalk.js, timeout=120, tag=WeTalk签到
+cron "20 0,8,16 * * *" script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.js, timeout=120, tag=WeTalk签到
 
 [MITM]
 hostname = api.wetalkapp.com
