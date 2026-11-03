@@ -1,4 +1,15 @@
+/*
+WeTalk（cloudsonly/Loon 插件版 + BoxJS 账号管理）
+插件: https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.plugin
+新增能力（需配合 BoxJS 订阅 wetalk.boxjs.json）：
+  BoxJS → WeTalk → 「清理动作」选 delete（删除下面序号）/ reset（清空），
+  然后打开一次 WeTalk App 触发抓包即生效，生效后自动复位为 off。
+不装 BoxJS 也能用：脚本会读同样的 3 个 key，可用「快捷指令/URL」或我的独立清理脚本设置。
+*/
 const scriptName = 'WeTalk';
+const K_ACCOUNT_LIST = '@WeTalk.accountList';
+const K_PRUNE_MODE = '@WeTalk.pruneMode';
+const K_DEL_INDEXES = '@WeTalk.delIndexes';
 const storeKey = 'wetalk_accounts_v1';
 const SECRET = '0fOiukQq7jXZV2GRi9LGlO';
 const API_HOST = 'api.wetalkapp.com';
@@ -132,6 +143,64 @@ function loadStore() {
 
 function saveStore(store) {
   $persistentStore.write(JSON.stringify(store), storeKey);
+}
+
+function readKey(key) {
+  try {
+    if (typeof $persistentStore !== 'undefined') return $persistentStore.read(key);
+    if (typeof $prefs !== 'undefined') return $prefs.valueForKey(key);
+  } catch (e) {}
+  return null;
+}
+
+function writeKey(val, key) {
+  try {
+    if (typeof $persistentStore !== 'undefined') return $persistentStore.write(val, key);
+    if (typeof $prefs !== 'undefined') return $prefs.setValueForKey(val, key);
+  } catch (e) {}
+}
+
+function accountListText(store) {
+  const rows = store.order.map((id, i) => {
+    const a = store.accounts[id] || {};
+    const t = a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '-';
+    return `${i + 1}. ${a.alias || '-'}  id:${id}  建于:${t}`;
+  });
+  return rows.length ? rows.join('\n') : '（空）';
+}
+
+function syncAccountList(store) {
+  writeKey(accountListText(store), K_ACCOUNT_LIST);
+}
+
+// 执行 BoxJS 里选好的清理动作；返回提示文案或 null
+function pruneStore(store) {
+  const mode = String(readKey(K_PRUNE_MODE) || 'off').trim();
+  const idxRaw = String(readKey(K_DEL_INDEXES) || '').trim();
+  let changed = null;
+
+  if (mode === 'reset') {
+    store.order = [];
+    store.accounts = {};
+    saveStore(store);
+    changed = '已清空账号库，请重新抓包';
+  } else if (mode === 'delete' && idxRaw) {
+    const idxs = idxRaw.split(/[,\s，]+/).map(x => parseInt(x, 10)).filter(n => n > 0);
+    const delIds = idxs.map(n => store.order[n - 1]).filter(Boolean);
+    store.order = store.order.filter(id => !delIds.includes(id));
+    Object.keys(store.accounts).forEach(id => { if (!store.order.includes(id)) delete store.accounts[id]; });
+    saveStore(store);
+    changed = `已删除 ${delIds.length} 个账号，剩余 ${store.order.length} 个`;
+  }
+  if (!changed) {
+    syncAccountList(store);
+    return null;
+  }
+  syncAccountList(store);
+  writeKey('off', K_PRUNE_MODE);
+  writeKey(store.order.length ? '1' : '', K_DEL_INDEXES);
+  console.log(`【${scriptName}】${changed}\n${accountListText(store)}`);
+  return changed;
 }
 
 function pickItem(arr, seed) {
@@ -288,13 +357,20 @@ function fetchApi(path) {
   });
 }
 
-if (typeof $request !== 'undefined' && $request) {
+function onCapture() {
   const paramsRaw = parseRawQuery($request.url);
   const headersMap = normalizeHeaderNameMap($request.headers || {});
   let baseUA = '';
   Object.keys(headersMap).forEach(k => { if (k.toLowerCase() === 'user-agent') baseUA = headersMap[k]; });
 
   const store = loadStore();
+  let pruneMsg = null;
+  try { pruneMsg = pruneStore(store); } catch (e) { console.log(`【${scriptName}】清理失败: ${e}`); }
+  if (pruneMsg) {
+    notify('🧹 账号库已维护', pruneMsg + '\n如需抓回当前账号，请再打开一次 App');
+    $done({});
+    return;
+  }
   const fp = fingerprintOf(paramsRaw);
   const now = Date.now();
   const existed = !!store.accounts[fp];
@@ -312,13 +388,19 @@ if (typeof $request !== 'undefined' && $request) {
   };
   if (!existed) store.order.push(fp);
   saveStore(store);
+  syncAccountList(store);
 
   const total = store.order.length;
   notify(existed ? '🔄 账号参数已更新' : '✅ 新账号已入库', `${alias}（id:${fp}）\n当前账号总数：${total}`);
   console.log(`【${scriptName}】${existed ? 'update' : 'add'} account ${fp}\n${JSON.stringify(store.accounts[fp], null, 2)}`);
   $done({});
+}
+
+if (typeof $request !== 'undefined' && $request) {
+  onCapture();
 } else {
   const store = loadStore();
+  syncAccountList(store);
   const ids = store.order.filter(id => store.accounts[id]);
   if (!ids.length) {
     notify('⚠️ 未抓到任何账号', '请先打开 WeTalk 触发抓包');
