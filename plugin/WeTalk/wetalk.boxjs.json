@@ -10,61 +10,15 @@
       "name": "WeTalk 多账号",
       "keys": [
         "wetalk_accounts_v1",
-        "WeTalk.delKeys",
-        "WeTalk.accountList",
-        "WeTalk.accountListText",
-        "WeTalk.accountRaw",
-        "WeTalk.clearAll",
-        "WeTalk.resetToken",
-        "WeTalk.lastDeleted"
+        "WeTalk.clearAll"
       ],
       "settings": [
         {
           "id": "@WeTalk.clearAll",
-          "name": "① 清空全部账号",
+          "name": "清空全部账号",
           "val": false,
           "type": "boolean",
-          "desc": "开启后点下方 ③ 的 ▶ 立即清空全部账号（也可打开一次 WeTalk App 触发）；完成后自动复位为关闭"
-        },
-        {
-          "id": "@WeTalk.accountListText",
-          "name": "② 已存账号（打勾＝标记删除）",
-          "val": "（触发一次抓包或点下方 ③ 后会刷新）",
-          "type": "textarea",
-          "rows": 14,
-          "autoGrow": true,
-          "persistentHint": true,
-          "desc": "打勾（☑）的账号会被标记删除，点右上角「保存」再点下方 ③ 的 ▶ 立刻生效。删完刷新成 【已删除】xxx · 日期（id 放最后），方便下次核对"
-        },
-        {
-          "id": "@WeTalk.lastDeleted",
-          "name": "上次删掉的账号",
-          "val": "",
-          "type": "textarea",
-          "rows": 4,
-          "autoGrow": true,
-          "persistentHint": true,
-          "desc": "每次删除后自动写入，例如〔已删除〕账号3 · uid:xxx · 11/4/2026  (e83e6b00908a)，用来核对真的删了哪个"
-        },
-        {
-          "id": "@WeTalk.accountRaw",
-          "name": "账号库原文",
-          "val": "",
-          "type": "textarea",
-          "rows": 12,
-          "autoGrow": true,
-          "persistentHint": true,
-          "desc": "点下方脚本「查看账号库原文」▶ 后自动写入；只读参考，不要手改"
-        },
-        {
-          "id": "@WeTalk.resetToken",
-          "name": "上次清理结果",
-          "val": "",
-          "type": "textarea",
-          "rows": 4,
-          "autoGrow": true,
-          "persistentHint": true,
-          "desc": "每次清理完成后自动写入，用来确认真的删掉了（例如「🗑 已删除 2 个账号，剩余 1 个」）"
+          "desc": "打开后点右上角 ▶ 执行一次即清空全部账号，完成后自动复位为关闭；之后重新抓包"
         }
       ],
       "author": "@ZenMoFiShi",
@@ -72,12 +26,16 @@
       "script": "https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.js",
       "scripts": [
         {
-          "name": "③ 执行清理（勾选/清空后点这里）",
-          "script": "https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.manage.js"
+          "name": "① 删除指定的账号（填序号，可多个）",
+          "script": "https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.del.js?index=1"
         },
         {
-          "name": "④ 查看账号库原文",
-          "script": "https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.list.js"
+          "name": "② 删除全部账号（先在上面打开开关）",
+          "script": "https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.del.js?all=1"
+        },
+        {
+          "name": "③ 只看账号列表（不改动）",
+          "script": "https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.del.js"
         }
       ],
       "icons": [
