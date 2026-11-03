@@ -1,50 +1,76 @@
 {
-  "id": "kufei326.wetalk.sub",
-  "name": "WeTalk 通用订阅",
+  "id": "cloudsonly.wetalk",
+  "name": "WeTalk",
   "author": "@ZenMoFiShi",
-  "icon": "https://raw.githubusercontent.com/Orz-3/mini/master/Color/box.png",
-  "repo": "https://github.com/kufei326/surge",
+  "icon": "https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png",
+  "repo": "https://github.com/cloudsonly/Loon",
   "apps": [
     {
       "id": "WeTalk",
-      "name": "WeTalk 自动化签到",
-      "keys": [],
+      "name": "WeTalk 多账号",
+      "keys": [
+        "wetalk_accounts_v1",
+        "WeTalk.delKeys",
+        "WeTalk.accountList",
+        "WeTalk.accountListText",
+        "WeTalk.accountRaw",
+        "WeTalk.clearAll",
+        "WeTalk.resetToken"
+      ],
       "settings": [
         {
+          "id": "@WeTalk.clearAll",
+          "name": "① 清空全部账号",
+          "val": false,
+          "type": "boolean",
+          "desc": "开启后点下方 ③ 的 ▶ 立即清空（或打开一次 WeTalk App 触发）；完成后自动复位为关闭，重新抓包即可"
+        },
+        {
           "id": "@WeTalk.accountList",
-          "name": "当前已存账号（只读）",
-          "val": "（空）",
+          "name": "② 已存账号（勾选＝标记删除）",
+          "val": "（账号库为空）",
+          "type": "checkboxes",
+          "desc": "要删哪个就勾哪个，然后点右上角「保存」，再点下方 ③ 的 ▶ 立即删除；☑ 标记已勾选待删除。删掉的账号如再抓包会重新加入",
+          "items": []
+        },
+        {
+          "id": "@WeTalk.accountRaw",
+          "name": "账号库原文",
+          "val": "",
           "type": "textarea",
-          "rows": 10,
+          "rows": 12,
           "autoGrow": true,
           "persistentHint": true,
-          "desc": "每次抓包或执行清理后自动刷新。序号就是下面要删除的序号"
+          "desc": "点下方脚本「查看账号库原文」▶ 后自动写入；只读参考，不要手改"
         },
         {
-          "id": "@WeTalk.pruneMode",
-          "name": "清理动作",
-          "val": "off",
-          "type": "selects",
-          "items": [
-            { "key": "off", "label": "off（不做任何清理）" },
-            { "key": "delete", "label": "delete（删除下方序号对应账号）" },
-            { "key": "reset", "label": "reset（清空全部账号重新抓包）" }
-          ],
-          "desc": "选好后，打开一次 WeTalk App 触发抓包即生效；生效后会自动变回 off"
-        },
-        {
-          "id": "@WeTalk.delIndexes",
-          "name": "要删除的账号序号",
-          "val": "1",
-          "type": "text",
-          "placeholder": "例: 2,3,5  或  2 3 5",
-          "desc": "对应上面列表的序号（从 1 开始），留空表示不删除。脚本会自动填上建议保留位"
+          "id": "@WeTalk.resetToken",
+          "name": "上次清理结果",
+          "val": "",
+          "type": "textarea",
+          "rows": 4,
+          "autoGrow": true,
+          "persistentHint": true,
+          "desc": "每次清理完成后自动写入，用来确认真的删掉了（例如「🗑 已删除 2 个账号，剩余 1 个」）"
         }
       ],
-      "author": "@ZenMoFiShi / Minis",
-      "repo": "https://github.com/kufei326/surge/blob/main/WeTalk.js",
-      "script": "https://raw.githubusercontent.com/kufei326/surge/main/WetTalk.js",
-      "icons": []
+      "author": "@ZenMoFiShi",
+      "repo": "https://github.com/cloudsonly/Loon/tree/main/plugin/WeTalk",
+      "script": "https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.js",
+      "scripts": [
+        {
+          "name": "③ 执行清理（勾选/清空后点这里）",
+          "script": "https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.manage.js"
+        },
+        {
+          "name": "④ 查看账号库原文",
+          "script": "https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.list.js"
+        }
+      ],
+      "icons": [
+        "https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png",
+        "https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png"
+      ]
     }
   ]
 }
