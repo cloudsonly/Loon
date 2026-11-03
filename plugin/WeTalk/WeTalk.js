@@ -1,16 +1,27 @@
 /*
-WeTalk（cloudsonly/Loon 插件版 + BoxJS 账号管理）
-插件: https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.plugin
-新增能力（需配合 BoxJS 订阅 wetalk.boxjs.json）：
-  BoxJS → WeTalk → 「清理动作」选 delete（删除下面序号）/ reset（清空），
-  然后打开一次 WeTalk App 触发抓包即生效，生效后自动复位为 off。
-不装 BoxJS 也能用：脚本会读同样的 3 个 key，可用「快捷指令/URL」或我的独立清理脚本设置。
+WeTalk 自动化签到 + 视频奖励
+作者: TG@ZenMoFiShi (Multi-Env) / 多账号管理适配: BoxJS
+
+====== BoxJS 使用说明 ======
+BoxJS → WeTalk → 可查看已存账号、勾选要删除的账号、清空账号库。
+「勾选要删除的账号」保存后，点下面「保存账号记录」脚本里的 ▶ 立即执行，或者在 Loon 里手动运行
+  https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.manage.js
+即可立刻删除（不需要打开 App 抓包）。
+
+[Loon]
+http-request ^https:\/\/api\.wetalkapp\.com\/app\/queryBalanceAndBonus script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.js, requires-body=true, tag=WeTalk抓包
+cron "20 0,8,16 * * *" script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.js, timeout=120, tag=WeTalk签到
+
+[MITM]
+hostname = api.wetalkapp.com
 */
+
 const scriptName = 'WeTalk';
-const K_ACCOUNT_LIST = '@WeTalk.accountList';
-const K_PRUNE_MODE = '@WeTalk.pruneMode';
-const K_DEL_INDEXES = '@WeTalk.delIndexes';
+const SCRIPT_VERSION = 'BoxJS.2026-11-04'; // 确认是否拉到最新版
 const storeKey = 'wetalk_accounts_v1';
+const K_DEL_KEYS = '@WeTalk.delKeys';
+const K_CLEAR_ALL = '@WeTalk.clearAll';
+const K_RESET_TOKEN = '@WeTalk.resetToken';
 const SECRET = '0fOiukQq7jXZV2GRi9LGlO';
 const API_HOST = 'api.wetalkapp.com';
 const MAX_VIDEO = 5;
@@ -22,6 +33,21 @@ const IOS_SCALES = ['2.00','3.00','3.00','2.00','3.00'];
 const IPHONE_MODELS = ['iPhone14,3','iPhone13,3','iPhone15,3','iPhone16,1','iPhone14,7','iPhone13,2','iPhone15,2','iPhone12,1'];
 const CFN_VERS = ['1410.0.3','1494.0.7','1568.100.1','1209.1','1474.0.4','1568.200.2'];
 const DARWIN_VERS = ['22.6.0','23.5.0','23.6.0','24.0.0','22.4.0'];
+
+function readKey(key) {
+  try {
+    if (typeof $persistentStore !== 'undefined') return $persistentStore.read(key);
+    if (typeof $prefs !== 'undefined') return $prefs.valueForKey(key);
+  } catch (e) {}
+  return null;
+}
+
+function writeKey(val, key) {
+  try {
+    if (typeof $persistentStore !== 'undefined') return $persistentStore.write(val, key);
+    if (typeof $prefs !== 'undefined') return $prefs.setValueForKey(val, key);
+  } catch (e) {}
+}
 
 function MD5(string) {
   function RotateLeft(lValue, iShiftBits) { return (lValue << iShiftBits) | (lValue >>> (32 - iShiftBits)); }
@@ -61,64 +87,86 @@ function MD5(string) {
     return lWordArray;
   }
   function WordToHex(lValue) {
-    let WordToHexValue = '';
-    for (let lCount = 0; lCount <= 3; lCount++) {
-      const lByte = (lValue >>> (lCount * 8)) & 255;
-      const WordToHexValue_temp = '0' + lByte.toString(16);
-      WordToHexValue += WordToHexValue_temp.substr(WordToHexValue_temp.length - 2, 2);
+    let WordToHexValue = '', WordToHexValue_temp = '', lByte, lCount;
+    for (lCount = 0; lCount <= 3; lCount++) {
+      lByte = (lValue >>> (lCount * 8)) & 255;
+      WordToHexValue_temp = '0' + lByte.toString(16);
+      WordToHexValue = WordToHexValue + WordToHexValue_temp.substr(WordToHexValue_temp.length - 2, 2);
     }
     return WordToHexValue;
   }
-  const x = ConvertToWordArray(string);
-  let a = 0x67452301, b = 0xEFCDAB89, c = 0x98BADCFE, d = 0x10325476;
+  function Utf8Encode(string) {
+    string = string.replace(/\r\n/g, '\n');
+    let utftext = '';
+    for (let n = 0; n < string.length; n++) {
+      const c = string.charCodeAt(n);
+      if (c < 128) utftext += String.fromCharCode(c);
+      else if (c > 127 && c < 2048) { utftext += String.fromCharCode((c >> 6) | 192); utftext += String.fromCharCode((c & 63) | 128); }
+      else { utftext += String.fromCharCode((c >> 12) | 224); utftext += String.fromCharCode(((c >> 6) & 63) | 128); utftext += String.fromCharCode((c & 63) | 128); }
+    }
+    return utftext;
+  }
+  let x = Array();
+  let k, AA, BB, CC, DD, a, b, c, d;
   const S11 = 7, S12 = 12, S13 = 17, S14 = 22, S21 = 5, S22 = 9, S23 = 14, S24 = 20;
   const S31 = 4, S32 = 11, S33 = 16, S34 = 23, S41 = 6, S42 = 10, S43 = 15, S44 = 21;
-  for (let k = 0; k < x.length; k += 16) {
-    const AA = a, BB = b, CC = c, DD = d;
-    a = FF(a,b,c,d,x[k+0],S11,0xD76AA478); d = FF(d,a,b,c,x[k+1],S12,0xE8C7B756); c = FF(c,d,a,b,x[k+2],S13,0x242070DB); b = FF(b,c,d,a,x[k+3],S14,0xC1BDCEEE);
-    a = FF(a,b,c,d,x[k+4],S11,0xF57C0FAF); d = FF(d,a,b,c,x[k+5],S12,0x4787C62A); c = FF(c,d,a,b,x[k+6],S13,0xA8304613); b = FF(b,c,d,a,x[k+7],S14,0xFD469501);
-    a = FF(a,b,c,d,x[k+8],S11,0x698098D8); d = FF(d,a,b,c,x[k+9],S12,0x8B44F7AF); c = FF(c,d,a,b,x[k+10],S13,0xFFFF5BB1); b = FF(b,c,d,a,x[k+11],S14,0x895CD7BE);
-    a = FF(a,b,c,d,x[k+12],S11,0x6B901122); d = FF(d,a,b,c,x[k+13],S12,0xFD987193); c = FF(c,d,a,b,x[k+14],S13,0xA679438E); b = FF(b,c,d,a,x[k+15],S14,0x49B40821);
-    a = GG(a,b,c,d,x[k+1],S21,0xF61E2562); d = GG(d,a,b,c,x[k+6],S22,0xC040B340); c = GG(c,d,a,b,x[k+11],S23,0x265E5A51); b = GG(b,c,d,a,x[k+0],S24,0xE9B6C7AA);
-    a = GG(a,b,c,d,x[k+5],S21,0xD62F105D); d = GG(d,a,b,c,x[k+10],S22,0x02441453); c = GG(c,d,a,b,x[k+15],S23,0xD8A1E681); b = GG(b,c,d,a,x[k+4],S24,0xE7D3FBC8);
-    a = GG(a,b,c,d,x[k+9],S21,0x21E1CDE6); d = GG(d,a,b,c,x[k+14],S22,0xC33707D6); c = GG(c,d,a,b,x[k+3],S23,0xF4D50D87); b = GG(b,c,d,a,x[k+8],S24,0x455A14ED);
-    a = GG(a,b,c,d,x[k+13],S21,0xA9E3E905); d = GG(d,a,b,c,x[k+2],S22,0xFCEFA3F8); c = GG(c,d,a,b,x[k+7],S23,0x676F02D9); b = GG(b,c,d,a,x[k+12],S24,0x8D2A4C8A);
-    a = HH(a,b,c,d,x[k+5],S31,0xFFFA3942); d = HH(d,a,b,c,x[k+8],S32,0x8771F681); c = HH(c,d,a,b,x[k+11],S33,0x6D9D6122); b = HH(b,c,d,a,x[k+14],S34,0xFDE5380C);
-    a = HH(a,b,c,d,x[k+1],S31,0xA4BEEA44); d = HH(d,a,b,c,x[k+4],S32,0x4BDECFA9); c = HH(c,d,a,b,x[k+7],S33,0xF6BB4B60); b = HH(b,c,d,a,x[k+10],S34,0xBEBFBC70);
-    a = HH(a,b,c,d,x[k+13],S31,0x289B7EC6); d = HH(d,a,b,c,x[k+0],S32,0xEAA127FA); c = HH(c,d,a,b,x[k+3],S33,0xD4EF3085); b = HH(b,c,d,a,x[k+6],S34,0x04881D05);
-    a = HH(a,b,c,d,x[k+9],S31,0xD9D4D039); d = HH(d,a,b,c,x[k+12],S32,0xE6DB99E5); c = HH(c,d,a,b,x[k+15],S33,0x1FA27CF8); b = HH(b,c,d,a,x[k+2],S34,0xC4AC5665);
-    a = II(a,b,c,d,x[k+0],S41,0xF4292244); d = II(d,a,b,c,x[k+7],S42,0x432AFF97); c = II(c,d,a,b,x[k+14],S43,0xAB9423A7); b = II(b,c,d,a,x[k+5],S44,0xFC93A039);
-    a = II(a,b,c,d,x[k+12],S41,0x655B59C3); d = II(d,a,b,c,x[k+3],S42,0x8F0CCC92); c = II(c,d,a,b,x[k+10],S43,0xFFEFF47D); b = II(b,c,d,a,x[k+1],S44,0x85845DD1);
-    a = II(a,b,c,d,x[k+8],S41,0x6FA87E4F); d = II(d,a,b,c,x[k+15],S42,0xFE2CE6E0); c = II(c,d,a,b,x[k+6],S43,0xA3014314); b = II(b,c,d,a,x[k+13],S44,0x4E0811A1);
-    a = II(a,b,c,d,x[k+4],S41,0xF7537E82); d = II(d,a,b,c,x[k+11],S42,0xBD3AF235); c = II(c,d,a,b,x[k+2],S43,0x2AD7D2BB); b = II(b,c,d,a,x[k+9],S44,0xEB86D391);
-    a = AddUnsigned(a,AA); b = AddUnsigned(b,BB); c = AddUnsigned(c,CC); d = AddUnsigned(d,DD);
+  string = Utf8Encode(string);
+  x = ConvertToWordArray(string);
+  a = 0x67452301; b = 0xEFCDAB89; c = 0x98BADCFE; d = 0x10325476;
+  for (k = 0; k < x.length; k += 16) {
+    AA = a; BB = b; CC = c; DD = d;
+    a = FF(a, b, c, d, x[k + 0], S11, 0xD76AA478); d = FF(d, a, b, c, x[k + 1], S12, 0xE8C7B756);
+    c = FF(c, d, a, b, x[k + 2], S13, 0x242070DB); b = FF(b, c, d, a, x[k + 3], S14, 0xC1BDCEEE);
+    a = FF(a, b, c, d, x[k + 4], S11, 0xF57C0FAF); d = FF(d, a, b, c, x[k + 5], S12, 0x4787C62A);
+    c = FF(c, d, a, b, x[k + 6], S13, 0xA8304613); b = FF(b, c, d, a, x[k + 7], S14, 0xFD469501);
+    a = FF(a, b, c, d, x[k + 8], S11, 0x698098D8); d = FF(d, a, b, c, x[k + 9], S12, 0x8B44F7AF);
+    c = FF(c, d, a, b, x[k + 10], S13, 0xFFFF5BB1); b = FF(b, c, d, a, x[k + 11], S14, 0x895CD7BE);
+    a = FF(a, b, c, d, x[k + 12], S11, 0x6B901122); d = FF(d, a, b, c, x[k + 13], S12, 0xFD987193);
+    c = FF(c, d, a, b, x[k + 14], S13, 0xA679438E); b = FF(b, c, d, a, x[k + 15], S14, 0x49B40821);
+    a = GG(a, b, c, d, x[k + 1], S21, 0xF61E2562); d = GG(d, a, b, c, x[k + 6], S22, 0xC040B340);
+    c = GG(c, d, a, b, x[k + 11], S23, 0x265E5A51); b = GG(b, c, d, a, x[k + 0], S24, 0xE9B6C7AA);
+    a = GG(a, b, c, d, x[k + 5], S21, 0xD62F105D); d = GG(d, a, b, c, x[k + 10], S22, 0x02441453);
+    c = GG(c, d, a, b, x[k + 15], S23, 0xD8A1E681); b = GG(b, c, d, a, x[k + 4], S24, 0xE7D3FBC8);
+    a = GG(a, b, c, d, x[k + 9], S21, 0x21E1CDE6); d = GG(d, a, b, c, x[k + 14], S22, 0xC33707D6);
+    c = GG(c, d, a, b, x[k + 3], S23, 0xF4D50D87); b = GG(b, c, d, a, x[k + 8], S24, 0x455A14ED);
+    a = GG(a, b, c, d, x[k + 13], S21, 0xA9E3E905); d = GG(d, a, b, c, x[k + 2], S22, 0xFCEFA3F8);
+    c = GG(c, d, a, b, x[k + 7], S23, 0x676F02D9); b = GG(b, c, d, a, x[k + 12], S24, 0x8D2A4C8A);
+    a = HH(a, b, c, d, x[k + 5], S31, 0xFFFA3942); d = HH(d, a, b, c, x[k + 8], S32, 0x8771F681);
+    c = HH(c, d, a, b, x[k + 11], S33, 0x6D9D6122); b = HH(b, c, d, a, x[k + 14], S34, 0xFDE5380C);
+    a = HH(a, b, c, d, x[k + 1], S31, 0xA4BEEA44); d = HH(d, a, b, c, x[k + 4], S32, 0x4BDECFA9);
+    c = HH(c, d, a, b, x[k + 7], S33, 0xF6BB4B60); b = HH(b, c, d, a, x[k + 10], S34, 0xBEBFBC70);
+    a = HH(a, b, c, d, x[k + 13], S31, 0x289B7EC6); d = HH(d, a, b, c, x[k + 0], S32, 0xEAA127FA);
+    c = HH(c, d, a, b, x[k + 3], S33, 0xD4EF3085); b = HH(b, c, d, a, x[k + 6], S34, 0x04881D05);
+    a = HH(a, b, c, d, x[k + 9], S31, 0xD9D4D039); d = HH(d, a, b, c, x[k + 12], S32, 0xE6DB99E5);
+    c = HH(c, d, a, b, x[k + 15], S33, 0x1FA27CF8); b = HH(b, c, d, a, x[k + 2], S34, 0xC4AC5665);
+    a = II(a, b, c, d, x[k + 0], S41, 0xF4292244); d = II(d, a, b, c, x[k + 7], S42, 0x432AFF97);
+    c = II(c, d, a, b, x[k + 14], S43, 0xAB9423A7); b = II(b, c, d, a, x[k + 5], S44, 0xFC93A039);
+    a = II(a, b, c, d, x[k + 12], S41, 0x655B59C3); d = II(d, a, b, c, x[k + 3], S42, 0x8F0CCC92);
+    c = II(c, d, a, b, x[k + 10], S43, 0xFFEFF47D); b = II(b, c, d, a, x[k + 1], S44, 0x85845DD1);
+    a = II(a, b, c, d, x[k + 8], S41, 0x6FA87E4F); d = II(d, a, b, c, x[k + 15], S42, 0xFE2CE6E0);
+    c = II(c, d, a, b, x[k + 6], S43, 0xA3014314); b = II(b, c, d, a, x[k + 13], S44, 0x4E0811A1);
+    a = II(a, b, c, d, x[k + 4], S41, 0xF7537E82); d = II(d, a, b, c, x[k + 11], S42, 0xBD3AF235);
+    c = II(c, d, a, b, x[k + 2], S43, 0x2AD7D2BB); b = II(b, c, d, a, x[k + 9], S44, 0xEB86D391);
+    a = AddUnsigned(a, AA); b = AddUnsigned(b, BB); c = AddUnsigned(c, CC); d = AddUnsigned(d, DD);
   }
   return (WordToHex(a) + WordToHex(b) + WordToHex(c) + WordToHex(d)).toLowerCase();
 }
-
-function getUTCSignDate() {
-  const now = new Date();
-  const pad = n => String(n).padStart(2, '0');
-  return `${now.getUTCFullYear()}-${pad(now.getUTCMonth()+1)}-${pad(now.getUTCDate())} ${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}:${pad(now.getUTCSeconds())}`;
+function parseRawQuery(url) {
+  const rawMap = {};
+  const idx = url.indexOf('?');
+  if (idx < 0) return rawMap;
+  url.slice(idx + 1).split('&').forEach(pair => {
+    if (!pair) return;
+    const i = pair.indexOf('=');
+    if (i < 0) return;
+    rawMap[pair.slice(0, i)] = pair.slice(i + 1);
+  });
+  return rawMap;
 }
 
 function normalizeHeaderNameMap(headers) {
-  const out = {};
-  Object.keys(headers || {}).forEach(k => out[k] = headers[k]);
-  return out;
-}
-
-function parseRawQuery(url) {
-  const query = (url.split('?')[1] || '').split('#')[0];
   const rawMap = {};
-  query.split('&').forEach(pair => {
-    if (!pair) return;
-    const idx = pair.indexOf('=');
-    if (idx < 0) return;
-    const k = pair.slice(0, idx);
-    const v = pair.slice(idx + 1);
-    rawMap[k] = v;
-  });
+  Object.keys(headers || {}).forEach(k => rawMap[k] = headers[k]);
   return rawMap;
 }
 
@@ -129,12 +177,13 @@ function fingerprintOf(paramsRaw) {
 }
 
 function loadStore() {
-  const raw = $persistentStore.read(storeKey);
+  const raw = readKey(storeKey);
   if (!raw) return { version: 1, accounts: {}, order: [] };
   try {
     const obj = JSON.parse(raw);
     if (!obj.accounts) obj.accounts = {};
     if (!Array.isArray(obj.order)) obj.order = Object.keys(obj.accounts);
+    obj.order = obj.order.filter(id => obj.accounts[id]);
     return obj;
   } catch (e) {
     return { version: 1, accounts: {}, order: [] };
@@ -142,64 +191,90 @@ function loadStore() {
 }
 
 function saveStore(store) {
-  $persistentStore.write(JSON.stringify(store), storeKey);
+  writeKey(JSON.stringify(store), storeKey);
 }
 
-function readKey(key) {
-  try {
-    if (typeof $persistentStore !== 'undefined') return $persistentStore.read(key);
-    if (typeof $prefs !== 'undefined') return $prefs.valueForKey(key);
-  } catch (e) {}
-  return null;
+/* ==================== BoxJS 账号管理 ==================== */
+
+function accountLabel(acc) {
+  const cap = acc.capture || {};
+  const p = cap.paramsRaw || {};
+  const uid = p.uid || p.userId || p.id || p.account || p.mobile || p.phone || '';
+  const created = acc.createdAt ? new Date(acc.createdAt).toLocaleDateString() : '';
+  return `${acc.alias || acc.id}${uid ? ' · ' + String(uid).slice(0, 22) : ''}${created ? ' · ' + created : ''}`;
 }
 
-function writeKey(val, key) {
-  try {
-    if (typeof $persistentStore !== 'undefined') return $persistentStore.write(val, key);
-    if (typeof $prefs !== 'undefined') return $prefs.setValueForKey(val, key);
-  } catch (e) {}
+function splitKeys(text) {
+  return String(text || '').split(/[,\s，、;；\n]+/).map(x => x.trim()).filter(Boolean);
 }
 
-function accountListText(store) {
-  const rows = store.order.map((id, i) => {
-    const a = store.accounts[id] || {};
-    const t = a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '-';
-    return `${i + 1}. ${a.alias || '-'}  id:${id}  建于:${t}`;
+// 把 BoxJS「账号列表」渲染成与勾选状态一致（{id,key,label} 供前端取，另存一份可读文本）
+function renderAccountList(store, keys) {
+  const selected = new Set(keys || []);
+  const items = store.order.map(id => {
+    const acc = store.accounts[id] || {};
+    return { id, key: id, label: accountLabel(acc) };
   });
-  return rows.length ? rows.join('\n') : '（空）';
+  const text = items.length ? items.map((it, i) => `${i + 1}. ${selected.has(it.id) ? '☑' : '☐'} ${it.label}  (${it.id})`).join('\n') : '（账号库为空）';
+  writeKey(JSON.stringify(items), '@WeTalk.accountList');
+  writeKey(text, '@WeTalk.accountListText');
 }
 
-function syncAccountList(store) {
-  writeKey(accountListText(store), K_ACCOUNT_LIST);
-}
+// 真正执行 BoxJS 里已保存的清理动作；返回产生的提示文案（数组）
+function applyBoxjsCleaning(store) {
+  const msgs = [];
 
-// 执行 BoxJS 里选好的清理动作；返回提示文案或 null
-function pruneStore(store) {
-  const mode = String(readKey(K_PRUNE_MODE) || 'off').trim();
-  const idxRaw = String(readKey(K_DEL_INDEXES) || '').trim();
-  let changed = null;
-
-  if (mode === 'reset') {
+  const clearAll = String(readKey(K_CLEAR_ALL) || 'false').trim();
+  if (clearAll === 'true' || clearAll === '1') {
     store.order = [];
     store.accounts = {};
     saveStore(store);
-    changed = '已清空账号库，请重新抓包';
-  } else if (mode === 'delete' && idxRaw) {
-    const idxs = idxRaw.split(/[,\s，]+/).map(x => parseInt(x, 10)).filter(n => n > 0);
-    const delIds = idxs.map(n => store.order[n - 1]).filter(Boolean);
+    writeKey('false', K_CLEAR_ALL);
+    writeKey('[]', K_DEL_KEYS);
+    msgs.push('✅ 已清空全部账号，请重新抓包');
+    return msgs;
+  }
+
+  let delIds = [];
+  try {
+    const raw = readKey(K_DEL_KEYS);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) delIds = arr.map(x => String(x)).filter(Boolean);
+    }
+  } catch (e) {}
+
+  if (delIds.length) {
+    const hit = delIds.filter(id => store.accounts[id]);
     store.order = store.order.filter(id => !delIds.includes(id));
     Object.keys(store.accounts).forEach(id => { if (!store.order.includes(id)) delete store.accounts[id]; });
-    saveStore(store);
-    changed = `已删除 ${delIds.length} 个账号，剩余 ${store.order.length} 个`;
+    if (hit.length) {
+      saveStore(store);
+      msgs.push(`🗑 已删除 ${hit.length} 个账号，剩余 ${store.order.length} 个`);
+    } else {
+      msgs.push(`⚠️ 勾选的账号已不存在，忽略（剩余 ${store.order.length} 个）`);
+    }
+    writeKey('[]', K_DEL_KEYS);
   }
-  if (!changed) {
-    syncAccountList(store);
-    return null;
-  }
-  syncAccountList(store);
-  writeKey('off', K_PRUNE_MODE);
-  writeKey(store.order.length ? '1' : '', K_DEL_INDEXES);
-  console.log(`【${scriptName}】${changed}\n${accountListText(store)}`);
+  return msgs;
+}
+
+function finishManage(store, msgs) {
+  renderAccountList(store);
+  writeKey(JSON.stringify(msgs && msgs.length ? msgs : ['✅ 账号库无需变更']), K_RESET_TOKEN);
+  return msgs;
+}
+
+// 独立的清理脚本入口（BoxJS「保存账号记录」▶ / Loon 手动运行 / cron）
+function runManage() {
+  const store = loadStore();
+  const before = store.order.length;
+  const msgs = applyBoxjsCleaning(store);
+  renderAccountList(store);
+  const changed = store.order.length !== before || msgs.length;
+  writeKey(JSON.stringify(msgs.length ? msgs : ['ℹ️ 当前共 ' + store.order.length + ' 个账号，无需清理']), K_RESET_TOKEN);
+  notify('账号库维护', (msgs.length ? msgs.join('\n') : '当前共 ' + store.order.length + ' 个账号') + '\n' + (store.order.length ? store.order.map((id, i) => `${i + 1}. ${(store.accounts[id] || {}).alias || id}`).join('\n') : ''));
+  $.done({});
   return changed;
 }
 
@@ -224,6 +299,12 @@ function buildUA(baseUA, seed) {
     if (changed) return ua;
   }
   return `WeTalk/30.6.0 (com.innovationworks.wetalk; build:28; iOS ${iosVer}) Alamofire/5.4.3`;
+}
+
+function getUTCSignDate() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
 }
 
 function buildSignedParamsRaw(capture) {
@@ -261,11 +342,25 @@ function buildHeaders(capture, ua) {
 }
 
 function notify(title, body) {
-  if (typeof $notification !== 'undefined') {
-    $notification.post('WeTalk', title, body);
-  } else {
-    $notify('WeTalk', title, body);
-  }
+  try {
+    if (typeof $notification !== 'undefined') $notification.post(scriptName, title, body);
+    else if (typeof $notify !== 'undefined') $notify(scriptName, title, body);
+  } catch (e) {}
+}
+
+function http(method, options) {
+  return new Promise((resolve, reject) => {
+    if (typeof $task !== 'undefined') {
+      $task.fetch(options).then(res => resolve(res), err => reject(err && err.error || err));
+    } else if (typeof $httpClient !== 'undefined') {
+      $httpClient[method](options, (err, res, body) => {
+        if (err) reject(err);
+        else { res.body = body; resolve(res); }
+      });
+    } else {
+      reject('当前环境不支持网络请求');
+    }
+  });
 }
 
 function sleep(ms) {
@@ -279,25 +374,8 @@ function runAccount(acc, index, total) {
   const msgs = [tag];
 
 function fetchApi(path) {
-  return new Promise((resolve, reject) => {
-    $httpClient.get(
-      {
-        url: buildUrl(path, acc.capture),
-        headers: headers
-      },
-      (error, response, data) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve({
-            statusCode: response.status,
-            headers: response.headers,
-            body: data
-          });
-        }
-      }
-    );
-  });
+  const url = buildUrl(path, acc.capture);
+  return http('get', { url, headers });
 }
 
   function doVideoLoop(count) {
@@ -357,20 +435,25 @@ function fetchApi(path) {
   });
 }
 
+/* ==================== 入口 ==================== */
+
+const $ = {
+  log: (msg) => { try { console.log(`[${scriptName}] ${msg}`); } catch (e) {} },
+  done: (v) => { try { if (typeof $done !== 'undefined') $done(v || {}); } catch (e) {} }
+};
+
+// 抓包：先处理 BoxJS 里排队的清理，再入库
 function onCapture() {
+  const store = loadStore();
+  let cleanMsgs = [];
+  try { cleanMsgs = applyBoxjsCleaning(store); } catch (e) { $.log('清理失败 ' + e); }
+  renderAccountList(store, readKeysNow());
+
   const paramsRaw = parseRawQuery($request.url);
   const headersMap = normalizeHeaderNameMap($request.headers || {});
   let baseUA = '';
   Object.keys(headersMap).forEach(k => { if (k.toLowerCase() === 'user-agent') baseUA = headersMap[k]; });
 
-  const store = loadStore();
-  let pruneMsg = null;
-  try { pruneMsg = pruneStore(store); } catch (e) { console.log(`【${scriptName}】清理失败: ${e}`); }
-  if (pruneMsg) {
-    notify('🧹 账号库已维护', pruneMsg + '\n如需抓回当前账号，请再打开一次 App');
-    $done({});
-    return;
-  }
   const fp = fingerprintOf(paramsRaw);
   const now = Date.now();
   const existed = !!store.accounts[fp];
@@ -388,38 +471,56 @@ function onCapture() {
   };
   if (!existed) store.order.push(fp);
   saveStore(store);
-  syncAccountList(store);
+  renderAccountList(store, readKeysNow());
 
-  const total = store.order.length;
-  notify(existed ? '🔄 账号参数已更新' : '✅ 新账号已入库', `${alias}（id:${fp}）\n当前账号总数：${total}`);
-  console.log(`【${scriptName}】${existed ? 'update' : 'add'} account ${fp}\n${JSON.stringify(store.accounts[fp], null, 2)}`);
-  $done({});
+  if (cleanMsgs.length) {
+    notify('🧹 账号库已维护', cleanMsgs.join('\n') + `\n当前账号总数：${store.order.length}`);
+  }
+  notify(existed ? '🔄 账号参数已更新' : '✅ 新账号已入库', `${alias}（id:${fp}）\n当前账号总数：${store.order.length}\n可在 BoxJS → WeTalk 里删除不需要的账号`);
+  $.log(`获取/更新账号 Token 成功: ID => ${fp}`);
+  $.done({});
 }
 
-if (typeof $request !== 'undefined' && $request) {
+function readKeysNow() {
+  try {
+    const raw = readKey(K_DEL_KEYS);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.map(String) : [];
+  } catch (e) { return []; }
+}
+
+if (typeof $request !== 'undefined' && $request && $request.url) {
   onCapture();
+} else if (typeof $script !== 'undefined' && $script && /runManage/.test(String($script.name || ''))) {
+  runManage();
 } else {
+  // cron：先执行排队的清理，再跑签到
   const store = loadStore();
-  syncAccountList(store);
+  const cleanMsgs = applyBoxjsCleaning(store);
+  renderAccountList(store, readKeysNow());
   const ids = store.order.filter(id => store.accounts[id]);
   if (!ids.length) {
-    notify('⚠️ 未抓到任何账号', '请先打开 WeTalk 触发抓包');
-    $done();
+    $.log('未检测到已存储的账号数据，请先抓包');
+    notify('⚠️ 未抓到任何账号', (cleanMsgs.join('\n') + '\n' || '') + '请先打开 WeTalk 触发抓包');
+    $.done();
   } else {
     const total = ids.length;
     const results = [];
     let chain = Promise.resolve();
+    $.log(`=== 开始运行 WeTalk 自动化，共 ${total} 个账号 ===`);
     ids.forEach((id, idx) => {
       chain = chain.then(() => runAccount(store.accounts[id], idx, total))
         .then(text => { results.push(text); })
         .then(() => idx < ids.length - 1 ? sleep(ACCOUNT_GAP) : null);
     });
     chain.then(() => {
-      notify(`🎉 全部完成 (${total}个账号)`, results.join('\n———\n'));
-      $done();
+      $.log('=== 任务全部执行完毕 ===');
+      notify(`🎉 全部完成 (${total}个账号)`, (cleanMsgs.length ? cleanMsgs.join('\n') + '\n' : '') + results.join('\n———\n'));
+      $.done();
     }).catch(err => {
-      notify('❌ 任务异常', results.join('\n———\n') + '\n' + (err.error || String(err)));
-      $done();
+      $.log(`❌ 顶层任务异常: ${err}`);
+      notify('❌ 任务异常', results.join('\n———\n') + '\n' + (err && err.error || String(err)));
+      $.done();
     });
   }
 }
