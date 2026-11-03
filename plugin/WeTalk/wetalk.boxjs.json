@@ -15,7 +15,8 @@
         "WeTalk.accountListText",
         "WeTalk.accountRaw",
         "WeTalk.clearAll",
-        "WeTalk.resetToken"
+        "WeTalk.resetToken",
+        "WeTalk.lastDeleted"
       ],
       "settings": [
         {
@@ -23,15 +24,27 @@
           "name": "① 清空全部账号",
           "val": false,
           "type": "boolean",
-          "desc": "开启后点下方 ③ 的 ▶ 立即清空（或打开一次 WeTalk App 触发）；完成后自动复位为关闭，重新抓包即可"
+          "desc": "开启后点下方 ③ 的 ▶ 立即清空全部账号（也可打开一次 WeTalk App 触发）；完成后自动复位为关闭"
         },
         {
-          "id": "@WeTalk.accountList",
-          "name": "② 已存账号（勾选＝标记删除）",
-          "val": "（账号库为空）",
-          "type": "checkboxes",
-          "desc": "要删哪个就勾哪个，然后点右上角「保存」，再点下方 ③ 的 ▶ 立即删除；☑ 标记已勾选待删除。删掉的账号如再抓包会重新加入",
-          "items": []
+          "id": "@WeTalk.accountListText",
+          "name": "② 已存账号（打勾＝标记删除）",
+          "val": "（触发一次抓包或点下方 ③ 后会刷新）",
+          "type": "textarea",
+          "rows": 14,
+          "autoGrow": true,
+          "persistentHint": true,
+          "desc": "打勾（☑）的账号会被标记删除，点右上角「保存」再点下方 ③ 的 ▶ 立刻生效。删完刷新成 【已删除】xxx · 日期（id 放最后），方便下次核对"
+        },
+        {
+          "id": "@WeTalk.lastDeleted",
+          "name": "上次删掉的账号",
+          "val": "",
+          "type": "textarea",
+          "rows": 4,
+          "autoGrow": true,
+          "persistentHint": true,
+          "desc": "每次删除后自动写入，例如〔已删除〕账号3 · uid:xxx · 11/4/2026  (e83e6b00908a)，用来核对真的删了哪个"
         },
         {
           "id": "@WeTalk.accountRaw",
