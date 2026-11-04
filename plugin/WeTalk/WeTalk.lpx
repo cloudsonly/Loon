@@ -1,31 +1,19 @@
 #!name=WeTalk
-#!desc=WeTalk 自动化签到+视频奖励\n设置里的开关：抓包（抓到账号后关掉）/ 定时签到 / 视频奖励\n下面是可手动点的脚本：抓包一次、手动签到、账号列表、清空账号库
+#!desc=WeTalk 自动化签到+视频奖励（kufei326 原脚本 + 新版语法）\n抓包开关：抓到账号后关掉，Loon 就不再解密和解析该请求
 #!author= ZenMoFeiShi[https://github.com/ZenmoFeiShi?tab=repositories]
 #!homepage=https://github.com/cloudsonly/Loon
 #!icon=https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png
 #!loon_version=3.5.1(983)
-#!date = 2026-11-04 18:10:00
+#!date = 2026-11-04 18:20:00
 #!tag=签到
 
 [Argument]
-capture = switch,true,tag=抓包（抓到账号后关掉）,desc=关闭后不再自动解析 queryBalanceAndBonus；需补抓账号时点下面「抓包一次（手动）」
-checkin = switch,true,tag=定时签到,desc=关闭后 cron 不运行（手动签到不受影响）
-video = switch,true,tag=视频奖励,desc=关闭后只签到，不刷视频
+capture = switch,true,tag=抓包（抓到账号后关掉）,desc=打开时解析 queryBalanceAndBonus 并把账号写入账号库；关闭后这条规则整条不命中
 
 [Script]
-request if ${capture} == true && ${url} ~= /^https:\/\/api\.wetalkapp\.com\/app\/queryBalanceAndBonus/i then script("https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.capture.js") with tag="WeTalk抓包", requires_body=true
+request if ${capture} == true && ${url} ~= /^https:\/\/api\.wetalkapp\.com\/app\/queryBalanceAndBonus/i then script("https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.lpx.js") with tag="WeTalk抓包", requires_body=true
 
-cron "20 0,8,16 * * *" then script("https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.js", "do=cron") with tag="WeTalk签到", timeout=120, enable=${checkin}
-
-generic then script("https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.capture.js") with tag="抓包一次（手动）", img_url="https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png"
-
-generic then script("https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.js", "do=cron") with tag="手动签到一次", img_url="https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png"
-
-generic then script("https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.manage.js", "action=list") with tag="账号库：列表", img_url="https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png"
-
-generic then script("https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.manage.js", "action=clear") with tag="账号库：清空全部", img_url="https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png"
-
-generic then script("https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.manage.js", "action=delete&index=1") with tag="账号库：删除第1个", img_url="https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png"
+cron "20 0,8,16 * * *" then script("https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.lpx.js") with tag="WeTalk签到", timeout=120
 
 [MITM]
 hostname = api.wetalkapp.com
