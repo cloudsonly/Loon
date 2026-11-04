@@ -450,6 +450,7 @@ if (typeof $request !== 'undefined' && $request && $request.url) {
   const ids = store.order.filter(id => store.accounts[id]);
   if (!ids.length) {
     $.log('未检测到已存储的账号数据，请先抓包');
+    $.log('账号库原始内容: ' + String(readKey(storeKey) || '(空)').slice(0, 300));
     notify('⚠️ 未抓到任何账号', clearMsg + '请先打开 WeTalk 触发抓包');
     $.done();
   } else {
@@ -457,6 +458,7 @@ if (typeof $request !== 'undefined' && $request && $request.url) {
     const results = [];
     let chain = Promise.resolve();
     $.log(`=== 开始运行 WeTalk 自动化，共 ${total} 个账号 ===`);
+    ids.forEach((id, i) => $.log(`  账号${i + 1}: ${(store.accounts[id] || {}).alias || id}  id:${id}`));
     ids.forEach((id, idx) => {
       chain = chain.then(() => runAccount(store.accounts[id], idx, total))
         .then(text => { results.push(text); })
