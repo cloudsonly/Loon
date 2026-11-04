@@ -1,0 +1,21 @@
+#!name=NewAPI · 通用签到
+#!desc=任意 NewAPI 类型站点（one-api / new-api 面板）每日自动签到，支持多站点多账号。默认只做抓包：打开插件 → 登录站点进「个人设置」页（会请求 /api/user/self）→ 收到「✅ 抓包成功」→ 关掉抓包开关。每天 7:30 自动签到，结果弹通知。
+#!author=Curtinp118（脚本）/ Minis（Loon 移植）
+#!homepage=https://github.com/curtinp118/Scripthub
+#!loon_version=3.5.1(983)
+#!date=2026-11-05 02:00:00
+#!tag=签到
+
+[Argument]
+capture = switch,true,tag=【抓包】保存站点登录信息,desc=打开后抓取 /api/user/self 的请求头（Cookie + new-api-user）并保存；抓到后关掉可减少解密
+checkin = switch,true,tag=【定时】每天 07:30 签到,desc=关闭后定时任务不执行（手动执行仍可用）
+
+[Script]
+request if ${capture} == true && ${url} ~= /^https:\/\/[^\/]+\/api\/user\/self(\?|$)/i then script("https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/NewAPI/NewAPI.capture.js") with tag="NewAPI 抓包", requires_body=true
+
+cron "30 7 * * *" then script("https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/NewAPI/NewAPI.checkin.js") with tag="NewAPI 签到", enable=${checkin}, timeout=120
+
+generic then script("https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/NewAPI/NewAPI.checkin.js") with tag="立即签到（手动执行）"
+
+[MITM]
+hostname = *
