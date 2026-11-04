@@ -23,8 +23,9 @@ const K_CLEAR_ALL = '@WeTalk.clearAll';
 const SECRET = '0fOiukQq7jXZV2GRi9LGlO';
 const API_HOST = 'api.wetalkapp.com';
 const MAX_VIDEO = 5;
-const VIDEO_DELAY = 8000;
-const ACCOUNT_GAP = 3500;
+const VIDEO_DELAY = 6000;        // 视频之间等待（毫秒）
+const VIDEO_MAX_TOTAL = 100 * 1000; // 视频环节总时长上限，防止 cron 超时被杀
+const ACCOUNT_GAP = 2500;
 
 const IOS_VERSIONS = ['17.5.1','17.6.1','17.4.1','17.2.1','16.7.8','17.6','17.3.1','18.0.1','17.1.2','16.6.1'];
 const IOS_SCALES = ['2.00','3.00','3.00','2.00','3.00'];
@@ -302,14 +303,22 @@ function runAccount(acc, index, total) {
   const msgs = [tag];
 
 function fetchApi(path) {
+  // 与原版一致：所有接口都用 GET（签到/视频奖励也是 GET，改动请求方式可能被风控）
   const url = buildUrl(path, acc.capture);
+  $.log(`${tag} 请求 ${path}`);
   return http('get', { url, headers });
 }
 
   function doVideoLoop(count) {
+    const videoStart = Date.now();
     let i = 0;
     function next() {
       if (i >= count) return Promise.resolve();
+      if (Date.now() - videoStart > VIDEO_MAX_TOTAL) {
+        $.log(`${tag} 视频环节已达时长上限，提前结束`);
+        msgs.push(`⏱ 视频环节超时保护：只跑了 ${i}/${count}`);
+        return Promise.resolve();
+      }
       return new Promise(resolve => {
         setTimeout(() => {
           i++;
