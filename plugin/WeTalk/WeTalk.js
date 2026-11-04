@@ -21,16 +21,34 @@ const SCRIPT_VERSION = 'BoxJS.2026-11-04'; // 确认是否拉到最新版
 const storeKey = 'wetalk_accounts_v1';
 const K_CLEAR_ALL = '@WeTalk.clearAll';
 // Loon 插件开关（[Argument] 里声明，script(... , {$capture,$checkin,$video}) 传入）
+// 兼容两种插件写法：
+//  1) 新版对象写法 script("x.js", {$capture, $checkin, $video}) → $argument 是对象
+//  2) 旧版参数写法 argument="capture=${capture},checkin=${checkin},video=${video}" → $argument 是字符串
 const ARGUMENT = (() => {
   try {
-    if (typeof $argument !== 'undefined' && $argument) return typeof $argument === 'string' ? JSON.parse($argument) : $argument;
+    const a = (typeof $argument !== 'undefined') ? $argument : undefined;
+    if (a && typeof a === 'object') return a;
+    if (typeof a === 'string' && a.trim()) {
+      const t = a.trim();
+      if (t.charAt(0) === '{') return JSON.parse(t);
+      const out = {};
+      t.replace(/^\{|\}$/g, '').split(/[,;\n]/).forEach(pair => {
+        const i = pair.indexOf('=');
+        if (i < 0) { if (pair.trim()) out[pair.trim()] = true; return; }
+        const k = pair.slice(0, i).trim();
+        const v = pair.slice(i + 1).trim().replace(/^["']|["']$/g, '');
+        out[k] = (v === 'true') ? true : (v === 'false' ? false : v);
+      });
+      return out;
+    }
   } catch (e) {}
   return {};
 })();
+const truthy = (v) => !(v === false || v === 'false' || v === 0 || v === '0');
 const OPT = {
-  capture: ARGUMENT.capture !== false,   // 抓包入库开关
-  checkin: ARGUMENT.checkin !== false,   // 定时签到开关
-  video: ARGUMENT.video !== false        // 视频奖励开关
+  capture: truthy(ARGUMENT.capture),   // 抓包入库开关
+  checkin: truthy(ARGUMENT.checkin),   // 定时签到开关
+  video: truthy(ARGUMENT.video)        // 视频奖励开关
 };
 const SECRET = '0fOiukQq7jXZV2GRi9LGlO';
 const API_HOST = 'api.wetalkapp.com';
