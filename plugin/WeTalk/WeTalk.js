@@ -44,11 +44,12 @@ const ARGUMENT = (() => {
   } catch (e) {}
   return {};
 })();
-const truthy = (v) => !(v === false || v === 'false' || v === 0 || v === '0');
+// 只有明确拿到 false 才视为关闭：参数没传进来时保持开启，避免误判把抓包/签到关掉
+const isOff = (v) => v === false || v === 'false' || v === 0 || v === '0';
 const OPT = {
-  capture: truthy(ARGUMENT.capture),   // 抓包入库开关
-  checkin: truthy(ARGUMENT.checkin),   // 定时签到开关
-  video: truthy(ARGUMENT.video)        // 视频奖励开关
+  capture: !isOff(ARGUMENT.capture),   // 抓包入库开关
+  checkin: !isOff(ARGUMENT.checkin),   // 定时签到开关
+  video: !isOff(ARGUMENT.video)        // 视频奖励开关
 };
 const SECRET = '0fOiukQq7jXZV2GRi9LGlO';
 const API_HOST = 'api.wetalkapp.com';
@@ -469,14 +470,18 @@ function onCapture() {
 }
 
 
-if (typeof $request !== 'undefined' && $request && $request.url) {
+const SCRIPT_NAME_LOON = (typeof $script !== 'undefined' && $script && $script.name) ? String($script.name) : '';
+const IS_HTTP = typeof $request !== 'undefined' && $request && $request.url;
+$.log(`[${SCRIPT_NAME_LOON || 'cron'}] 参数: capture=${OPT.capture}, checkin=${OPT.checkin}, video=${OPT.video}`);
+
+if (IS_HTTP) {
   if (!OPT.capture) {
     $.log('抓包开关已关闭，跳过入库');
     $.done({});
   } else {
     onCapture();
   }
-} else if (!OPT.checkin) {
+} else if (!OPT.checkin && !/手动/.test(SCRIPT_NAME_LOON)) {
   $.log('签到开关已关闭（插件开关），本次不执行');
   $.done();
 } else {
