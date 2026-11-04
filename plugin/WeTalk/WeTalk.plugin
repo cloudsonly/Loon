@@ -1,21 +1,31 @@
 #!name=WeTalk
-#!desc=WeTalk 自动化签到+视频奖励\n多账号可在 BoxJS → WeTalk 中查看/删除；抓包插件抓到后可在 Loon 插件页把「抓包」开关关掉
+#!desc=WeTalk 自动化签到+视频奖励\n开关在「设置」里：抓包抓到账号后关掉即可；下方「脚本」可手动跑签到或清空账号库
 #!author= ZenMoFiShi[https://github.com/ZenmoFeiShi?tab=repositories]
 #!homepage=https://github.com/cloudsonly/Loon
 #!icon=https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png
 #!loon_version=3.5.1(983)
-#!date = 2026-11-04 17:30:00
+#!date = 2026-11-04 18:00:00
 #!tag=签到
 
 [Argument]
-capture = switch,true,type=boolean,tag=抓包（抓完账号后关掉）,desc=关闭后不再抓取 queryBalanceAndBonus，不影响定时签到和视频奖励
-checkin = switch,true,type=boolean,tag=定时签到,desc=关闭后 cron 不会运行
-video = switch,true,type=boolean,tag=视频奖励,desc=关闭后只签到，不刷视频
+capture = switch,true,tag=抓包（抓到账号后关掉）,desc=关闭后不再匹配 queryBalanceAndBonus，也不会写入新账号
+checkin = switch,true,tag=定时签到,desc=关闭后 cron 不会运行（手动签到不受影响）
+video = switch,true,tag=视频奖励,desc=关闭后只签到，不刷视频
+cron_time = input,"20 0,8,16 * * *",tag=签到时间(cron),desc=五段格式：分 时 日 月 周
+script_timeout = input,"120",type=number,tag=超时(秒)
 
 [Script]
 http-request ^https:\/\/api\.wetalkapp\.com\/app\/queryBalanceAndBonus script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.js, argument="capture=${capture},checkin=${checkin},video=${video}", requires-body=true, enable=${capture}, tag=WeTalk抓包
 
 cron "20 0,8,16 * * *" script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.js, argument="capture=${capture},checkin=${checkin},video=${video}", timeout=120, enable=${checkin}, tag=WeTalk签到
+
+generic script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.js, argument="capture=${capture},checkin=true,video=${video}", tag=WeTalk手动签到, img-url=https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png
+
+generic script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.manage.js, argument="action=list", tag=账号库：查看账号列表, img-url=https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png
+
+generic script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.manage.js, argument="action=clear", tag=账号库：清空全部, img-url=https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png
+
+generic script-path=https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/WeTalk/WeTalk.manage.js, argument="action=delete&index=1", tag=账号库：删除第1个（改 argument 里的 index）, img-url=https://raw.githubusercontent.com/Xhy333/QuantumultX/main/icon/WeTalk.png
 
 [MITM]
 hostname = api.wetalkapp.com
