@@ -20,6 +20,18 @@ const scriptName = 'WeTalk';
 const SCRIPT_VERSION = 'BoxJS.2026-11-04'; // 确认是否拉到最新版
 const storeKey = 'wetalk_accounts_v1';
 const K_CLEAR_ALL = '@WeTalk.clearAll';
+// Loon 插件开关（[Argument] 里声明，script(... , {$capture,$checkin,$video}) 传入）
+const ARGUMENT = (() => {
+  try {
+    if (typeof $argument !== 'undefined' && $argument) return typeof $argument === 'string' ? JSON.parse($argument) : $argument;
+  } catch (e) {}
+  return {};
+})();
+const OPT = {
+  capture: ARGUMENT.capture !== false,   // 抓包入库开关
+  checkin: ARGUMENT.checkin !== false,   // 定时签到开关
+  video: ARGUMENT.video !== false        // 视频奖励开关
+};
 const SECRET = '0fOiukQq7jXZV2GRi9LGlO';
 const API_HOST = 'api.wetalkapp.com';
 const MAX_VIDEO = 5;
@@ -373,6 +385,10 @@ function fetchApi(path) {
       if (d.retcode === 0) push(`✅ 签到：${(d.result?.bonusHint || d.retmsg || '').replace(/\n/g, ' ')}`);
       else push(`⚠️ 签到：${d.retmsg}`);
     } catch (e) { push('❌ 签到：解析失败'); }
+    if (!OPT.video) {
+      push('⏭ 视频奖励已关闭（插件开关）');
+      return Promise.resolve();
+    }
     return doVideoLoop(MAX_VIDEO);
   }).then(() => fetchApi('queryBalanceAndBonus')).then(res => {
     try {
@@ -436,9 +452,17 @@ function onCapture() {
 
 
 if (typeof $request !== 'undefined' && $request && $request.url) {
-  onCapture();
+  if (!OPT.capture) {
+    $.log('抓包开关已关闭，跳过入库');
+    $.done({});
+  } else {
+    onCapture();
+  }
+} else if (!OPT.checkin) {
+  $.log('签到开关已关闭（插件开关），本次不执行');
+  $.done();
 } else {
-  // cron：先执行排队的清理，再跑签到
+  // cron：先执行清空开关，再跑签到
   let store = loadStore();
   let clearMsg = '';
   if (takeClearAllSwitch()) {
