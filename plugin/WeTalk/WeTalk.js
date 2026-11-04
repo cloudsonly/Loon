@@ -279,15 +279,28 @@ function notify(title, body) {
 
 function http(method, options) {
   return new Promise((resolve, reject) => {
-    if (typeof $task !== 'undefined') {
-      $task.fetch(options).then(res => resolve(res), err => reject(err && err.error || err));
-    } else if (typeof $httpClient !== 'undefined') {
-      $httpClient[method](options, (err, res, body) => {
-        if (err) reject(err);
-        else { res.body = body; resolve(res); }
-      });
-    } else {
-      reject('当前环境不支持网络请求');
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) { settled = true; reject('请求超时(20s)'); }
+    }, 20000);
+    const finish = (fn, v) => { if (settled) return; settled = true; clearTimeout(timer); fn(v); };
+
+    try {
+      if (typeof $httpClient !== 'undefined' && typeof $httpClient[method] === 'function') {
+        $httpClient[method](options, (err, res, body) => {
+          if (err) return finish(reject, typeof err === 'string' ? err : (err.error || JSON.stringify(err)));
+          finish(resolve, { status: (res && res.status) || 200, headers: (res && res.headers) || {}, body: body === undefined ? '' : body });
+        });
+      } else if (typeof $task !== 'undefined') {
+        $task.fetch(options).then(
+          r => finish(resolve, { status: r.statusCode || r.status, headers: r.headers || {}, body: r.body || '' }),
+          e => finish(reject, (e && e.error) || String(e))
+        );
+      } else {
+        finish(reject, '当前环境不支持网络请求');
+      }
+    } catch (e) {
+      finish(reject, String(e));
     }
   });
 }
@@ -301,6 +314,7 @@ function runAccount(acc, index, total) {
   const ua = buildUA(acc.baseUA, acc.uaSeed);
   const headers = buildHeaders(acc.capture, ua);
   const msgs = [tag];
+  const push = (m) => { msgs.push(m); $.log(`${tag} ${m}`); };
 
 function fetchApi(path) {
   // 与原版一致：所有接口都用 GET（签到/视频奖励也是 GET，改动请求方式可能被风控）
@@ -316,7 +330,7 @@ function fetchApi(path) {
       if (i >= count) return Promise.resolve();
       if (Date.now() - videoStart > VIDEO_MAX_TOTAL) {
         $.log(`${tag} 视频环节已达时长上限，提前结束`);
-        msgs.push(`⏱ 视频环节超时保护：只跑了 ${i}/${count}`);
+        push(`⏱ 视频环节超时保护：只跑了 ${i}/${count}`);
         return Promise.resolve();
       }
       return new Promise(resolve => {
@@ -326,18 +340,18 @@ function fetchApi(path) {
             try {
               const d = JSON.parse(res.body);
               if (d.retcode === 0) {
-                msgs.push(`🎬 视频${i}：+${d.result?.bonus || '?'} Coins`);
+                push(`🎬 视频${i}：+${d.result?.bonus || '?'} Coins`);
                 resolve(next());
               } else {
-                msgs.push(`⏸ 视频${i}：${d.retmsg}`);
+                push(`⏸ 视频${i}：${d.retmsg}`);
                 resolve();
               }
             } catch (e) {
-              msgs.push(`❌ 视频${i}：解析失败`);
+              push(`❌ 视频${i}：解析失败`);
               resolve();
             }
           }).catch(err => {
-            msgs.push(`❌ 视频${i}：${err.error || '请求失败'}`);
+            push(`❌ 视频${i}：${err.error || '请求失败'}`);
             resolve();
           });
         }, i === 0 ? 1500 : VIDEO_DELAY);
@@ -349,21 +363,21 @@ function fetchApi(path) {
   return fetchApi('queryBalanceAndBonus').then(res => {
     try {
       const d = JSON.parse(res.body);
-      if (d.retcode === 0) msgs.push(`💰 余额：${d.result.balance} Coins`);
-      else msgs.push(`⚠️ 查询：${d.retmsg}`);
-    } catch (e) { msgs.push('❌ 查询：解析失败'); }
+      if (d.retcode === 0) push(`💰 余额：${d.result.balance} Coins`);
+      else push(`⚠️ 查询：${d.retmsg}`);
+    } catch (e) { push('❌ 查询：解析失败'); }
     return fetchApi('checkIn');
   }).then(res => {
     try {
       const d = JSON.parse(res.body);
-      if (d.retcode === 0) msgs.push(`✅ 签到：${(d.result?.bonusHint || d.retmsg || '').replace(/\n/g, ' ')}`);
-      else msgs.push(`⚠️ 签到：${d.retmsg}`);
-    } catch (e) { msgs.push('❌ 签到：解析失败'); }
+      if (d.retcode === 0) push(`✅ 签到：${(d.result?.bonusHint || d.retmsg || '').replace(/\n/g, ' ')}`);
+      else push(`⚠️ 签到：${d.retmsg}`);
+    } catch (e) { push('❌ 签到：解析失败'); }
     return doVideoLoop(MAX_VIDEO);
   }).then(() => fetchApi('queryBalanceAndBonus')).then(res => {
     try {
       const d = JSON.parse(res.body);
-      if (d.retcode === 0) msgs.push(`💰 最新余额：${d.result.balance} Coins`);
+      if (d.retcode === 0) push(`💰 最新余额：${d.result.balance} Coins`);
     } catch (e) {}
     return msgs.join('\n');
   }).catch(err => {
