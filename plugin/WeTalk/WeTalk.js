@@ -462,8 +462,10 @@ if (typeof $request !== 'undefined' && $request && $request.url) {
         .then(text => { results.push(text); })
         .then(() => idx < ids.length - 1 ? sleep(ACCOUNT_GAP) : null);
     });
+    const runStart = Date.now();
     chain.then(() => {
-      $.log('=== 任务全部执行完毕 ===');
+      $.log(`=== 任务全部执行完毕（${total} 个账号，耗时 ${Math.round((Date.now() - runStart) / 1000)} 秒）===`);
+      results.forEach((r, i) => $.log(`--- 账号${i + 1} 结果 ---\n${r}`));
       notify(`🎉 全部完成 (${total}个账号)`, clearMsg + results.join('\n———\n'));
       $.done();
     }).catch(err => {
