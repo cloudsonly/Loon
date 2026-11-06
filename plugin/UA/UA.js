@@ -1,7 +1,7 @@
 /*
  * UA 改写 —— 只对插件里填写的域名列表替换 User-Agent
  *
- * 配套插件：UA.lpx（MITM 精确到域名）/ UA.anyhost.lpx（MITM 全开，可随意加域名）
+ * 配套插件：UA.lpx（MITM hostname = *，任意域名只需改插件输入框）
  * 域名白名单由 [Argument] Hosts 传入，脚本侧再做一次严格校验。
  * 原脚本：https://he2o.vercel.app/Resource/Plugin/UA.js
  */
