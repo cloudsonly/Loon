@@ -1,13 +1,13 @@
-#!name=UA 改写 · 指定域名（推荐）
-#!desc=只对「生效域名」里填写的域名替换 User-Agent，插件里直接改、加域名即可。默认 yuanshen.help。MITM 精确到域名，最安全；换成完全不同主域时需同步改 [MITM] 那一行。
+#!name=UA 改写 · 指定域名
+#!desc=只对「生效域名」里填写的域名替换 User-Agent。改/加域名只需在插件里改输入框，无需改动任何配置。MITM 全开（hostname = *），需信任 Loon 的 CA。
 #!author=he2o（原脚本）/ Minis（参数化改造）
 #!homepage=https://github.com/cloudsonly/Loon
 #!loon_version=3.5.1(983)
-#!date=2026-11-07 03:10:00
+#!date=2026-11-07 03:17:00
 #!tag=工具,UA
 
 [Argument]
-Hosts = input,"yuanshen.help",tag=生效域名,desc=要改 UA 的域名，多个用英文逗号分隔（也可空格/换行）。支持完整 URL 和 *.example.com 通配。例：yuanshen.help, api.example.com, *.foo.com
+Hosts = input,"yuanshen.help",tag=生效域名,desc=要改 UA 的域名，多个用英文逗号分隔（也可空格/换行/分号）。支持完整 URL 和 *.example.com 通配。例：yuanshen.help, api.example.com, *.foo.com
 OldUA = input,"",tag=原 UA 特征,desc=按正则匹配当前 User-Agent。建议只填一段特征（如 iPhone OS 17_0），整条粘贴需转义 . + ( ) 等元字符。留空则不替换
 NewUA = input,"",tag=新 UA,desc=整条替换后的 User-Agent（不是替换匹配到的那一段）。留空则不替换
 
@@ -15,4 +15,4 @@ NewUA = input,"",tag=新 UA,desc=整条替换后的 User-Agent（不是替换匹
 request if ${url} ~= /^https?:\/\//i then script("https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/UA/UA.js", {${Hosts}, ${OldUA}, ${NewUA}}) with tag="UA替换", requires_body=false, timeout=10
 
 [MITM]
-hostname = yuanshen.help, *.yuanshen.help
+hostname = *
