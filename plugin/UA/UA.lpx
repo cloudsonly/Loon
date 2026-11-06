@@ -1,0 +1,17 @@
+#!name=UA 改写 · 仅 yuanshen.help（lpx）
+#!desc=只对 https://yuanshen.help(:443) 的请求替换 User-Agent；其它域名不解密、不改动。OldUA 按正则匹配，NewUA 整条替换，两项都填才生效。
+#!author=he2o（原脚本）/ Minis（限定域名）
+#!homepage=https://github.com/cloudsonly/Loon
+#!loon_version=3.5.1(983)
+#!date=2026-11-07 02:40:00
+#!tag=工具,UA
+
+[Argument]
+OldUA = input,"",tag=原 UA 特征,desc=按正则匹配当前 User-Agent。建议只填一段特征（如 iPhone OS 17_0），整条粘贴需转义 . + ( ) 等元字符。留空则不替换
+NewUA = input,"",tag=新 UA,desc=整条替换后的 User-Agent（不是替换匹配到的那一段）。留空则不替换
+
+[Script]
+request if ${url} ~= /^https?:\/\/yuanshen\.help(?::443)?(?:\/|\?|$)/i then script("https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/UA/UA.js", {${OldUA}, ${NewUA}}) with tag="UA替换", requires_body=false, timeout=10
+
+[MITM]
+hostname = yuanshen.help
