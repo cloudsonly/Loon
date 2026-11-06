@@ -1,0 +1,18 @@
+#!name=UA 改写 · 任意域名
+#!desc=只对「生效域名」里填写的域名替换 UA，加/改域名只填输入框即可，无需再动任何配置。代价：MITM 需解密全部 HTTPS（hostname = *）。若只在 yuanshen.help 及其子域用，请用更安全的 UA.lpx。
+#!author=he2o（原脚本）/ Minis（参数化改造）
+#!homepage=https://github.com/cloudsonly/Loon
+#!loon_version=3.5.1(983)
+#!date=2026-11-07 03:10:00
+#!tag=工具,UA
+
+[Argument]
+Hosts = input,"yuanshen.help",tag=生效域名,desc=要改 UA 的域名，多个用英文逗号分隔（也可空格/换行）。支持完整 URL 和 *.example.com 通配。例：yuanshen.help, api.example.com, *.foo.com
+OldUA = input,"",tag=原 UA 特征,desc=按正则匹配当前 User-Agent。建议只填一段特征（如 iPhone OS 17_0），整条粘贴需转义 . + ( ) 等元字符。留空则不替换
+NewUA = input,"",tag=新 UA,desc=整条替换后的 User-Agent（不是替换匹配到的那一段）。留空则不替换
+
+[Script]
+request if ${url} ~= /^https?:\/\//i then script("https://raw.githubusercontent.com/cloudsonly/Loon/refs/heads/main/plugin/UA/UA.js", {${Hosts}, ${OldUA}, ${NewUA}}) with tag="UA替换", requires_body=false, timeout=10
+
+[MITM]
+hostname = *
