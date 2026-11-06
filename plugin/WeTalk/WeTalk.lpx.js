@@ -268,6 +268,10 @@ function runAccount(acc, index, total) {
                 $.log(`${tag} 🎬 视频${i} 观看成功，获得奖励: +${d.result?.bonus || '?'} Coins`);
                 msgs.push(`🎬 视频${i}：+${d.result?.bonus || '?'} Coins`);
                 resolve(next());
+              } else if (/次数过多|稍后|频繁/.test(String(d.retmsg || ''))) {
+                $.log(`${tag} ⏸ 视频被限流，本轮停止：${d.retmsg}`);
+                msgs.push(`⏸ 视频：接口限流（${i - 1}/${count} 成功），稍后再试`);
+                resolve();
               } else {
                 $.log(`${tag} ⏸ 视频${i} 异常: ${d.retmsg}`);
                 msgs.push(`⏸ 视频${i}：${d.retmsg}`);
@@ -311,6 +315,9 @@ function runAccount(acc, index, total) {
         const hint = (d.result?.bonusHint || d.retmsg || '').replace(/\n/g, ' ');
         $.log(`${tag} ✅ 签到成功：${hint}`);
         msgs.push(`✅ 签到：${hint}`);
+      } else if (/已经签|已签|签过|明天再试/.test(String(d.retmsg || ''))) {
+        $.log(`${tag} ✅ 今天已签到：${d.retmsg}`);
+        msgs.push('✅ 签到：今天已签到（无需重复）');
       } else {
         $.log(`${tag} ⚠️ 签到异常：${d.retmsg}`);
         msgs.push(`⚠️ 签到：${d.retmsg}`);
